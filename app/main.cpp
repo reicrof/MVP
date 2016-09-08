@@ -130,6 +130,7 @@ int main()
 	glfwSetKeyCallback(window, keyCB);
 
 	VulkanGraphic VK;
+	VERIFY(VK.getPysicalDevices(), "Cannot get physical device.");
 
 	while (!glfwWindowShouldClose(window))
 	{

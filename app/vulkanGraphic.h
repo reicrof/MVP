@@ -3,6 +3,7 @@
 
 #include <vulkan\vulkan.h>
 #include <functional>
+#include <vector>
 
 template <typename T>
 class VDeleter
@@ -63,8 +64,20 @@ public:
 	VulkanGraphic();
 	~VulkanGraphic() = default;
 
+	bool getPysicalDevices();
+
 private:
 	VDeleter<VkInstance> _instance{ vkDestroyInstance };
+
+	struct PhysicalDevice
+	{
+		VkPhysicalDeviceProperties properties;
+		VkPhysicalDeviceFeatures features;
+		VkPhysicalDevice device;
+		int graphicFamily;
+		int presentationFamily;
+	} _physDevice;
+
 	VDeleter<VkDebugReportCallbackEXT> _validationCallback{ _instance, DestroyDebugReportCallbackEXT };
 };
 

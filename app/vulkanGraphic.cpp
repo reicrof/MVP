@@ -149,3 +149,55 @@ VulkanGraphic::VulkanGraphic()
 	VK_CALL( vkCreateInstance(&createInfo, nullptr, &_instance) );
 	setupDebugCallback(_instance, _validationCallback);
 }
+
+bool VulkanGraphic::getPysicalDevices()
+{
+	uint32_t deviceCount = 0;
+	vkEnumeratePhysicalDevices(_instance, &deviceCount, nullptr);
+
+	std::vector< VkPhysicalDevice > devices(deviceCount);
+	vkEnumeratePhysicalDevices(_instance, &deviceCount, devices.data());
+
+	int graphicFamily = -1;
+	int presentFamily = -1;
+	std::vector< VkPhysicalDeviceFeatures > features(deviceCount);
+	std::vector< VkPhysicalDeviceProperties > properties(deviceCount);
+	for (size_t i = 0; i < deviceCount; ++i)
+	{
+		vkGetPhysicalDeviceProperties(devices[i], &_physDevice.properties);
+		vkGetPhysicalDeviceFeatures(devices[i], &_physDevice.features);
+
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(devices[i], &queueFamilyCount, nullptr);
+
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(devices[i], &queueFamilyCount, queueFamilies.data());
+
+		std::vector<VkBool32> queuePresentSupport(queueFamilyCount);
+		for( uint32_t j = 0; j < queueFamilyCount; ++j )
+		{
+			VkBool32 presentationSupported = VK_FALSE;
+			vkGetPhysicalDeviceSurfaceSupportKHR(devices[i], j, VkSurfaceKHR(), &presentationSupported);
+			if (queueFamilies[j].queueCount > 0 && queueFamilies[j].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				graphicFamily = j;
+
+				// If the queue support both presentation and graphic, stop here.
+				if (presentationSupported) { presentFamily = j; break; }
+			}
+
+			if (presentationSupported) { presentFamily = j; }
+		}
+
+		// We have found the one.
+		if (graphicFamily >= 0 && presentFamily >= 0)
+		{
+			_physDevice.device = devices[i];
+			_physDevice.graphicFamily = graphicFamily;
+			_physDevice.presentationFamily = presentFamily;
+			return true;
+		}
+	}
+
+	return false;
+}
