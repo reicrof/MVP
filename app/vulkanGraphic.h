@@ -5,6 +5,8 @@
 #include <functional>
 #include <vector>
 
+struct GLFWwindow;
+
 template <typename T>
 class VDeleter
 {
@@ -61,22 +63,26 @@ void DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT
 class VulkanGraphic
 {
 public:
-	VulkanGraphic();
+	VulkanGraphic(std::vector<const char*> instanceExtensions);
 	~VulkanGraphic() = default;
 
 	bool getPysicalDevices();
+	bool createLogicalDevice();
+	bool createSurface(GLFWwindow* window);
 
 private:
-	VDeleter<VkInstance> _instance{ vkDestroyInstance };
+	struct Queue {
+		int familyIndex;
+		VkQueue handle;
+	};
 
-	struct PhysicalDevice
-	{
-		VkPhysicalDeviceProperties properties;
-		VkPhysicalDeviceFeatures features;
-		VkPhysicalDevice device;
-		int graphicFamily;
-		int presentationFamily;
-	} _physDevice;
+	VDeleter<VkInstance> _instance{ vkDestroyInstance };
+	VkPhysicalDevice _physDevice;
+	Queue _graphicQueue;
+	Queue _presentationQueue;
+	VDeleter<VkSurfaceKHR> _surface{ _instance, vkDestroySurfaceKHR };
+
+	VDeleter<VkDevice> _device{ vkDestroyDevice };
 
 	VDeleter<VkDebugReportCallbackEXT> _validationCallback{ _instance, DestroyDebugReportCallbackEXT };
 };

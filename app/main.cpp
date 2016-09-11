@@ -17,7 +17,9 @@ template< typename T >
 void VERIFY(T x, const char* msg)
 {
 	if (!x) {
+		char c;
 		std::cerr << msg << std::endl;
+		std::cin >> c;
 		exit(EXIT_FAILURE);
 	}
 }
@@ -114,6 +116,20 @@ void updateCoreDll()
 	}
 }
 
+static void initVulkan(GLFWwindow* window)
+{
+	unsigned int glfwExtensionCount = 0;
+	const char** glfwExtensions;
+	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+	std::vector< const char* > extensions(glfwExtensionCount);
+	std::copy(glfwExtensions, glfwExtensions + glfwExtensionCount, extensions.begin());
+
+	VulkanGraphic VK(extensions);
+	VERIFY(VK.createSurface(window), "Cannot create vulkan surface.");
+	VERIFY(VK.getPysicalDevices(), "Cannot get physical device.");
+	VERIFY(VK.createLogicalDevice(), "Cannot create logical device.");
+}
+
 int main()
 {	
 	VERIFY(glfwInit(), "Cannot init glfw.");
@@ -126,11 +142,10 @@ int main()
 
 	VERIFY(window, "Could not create GLFW window.");
 
+	initVulkan( window );
+
 	// Setup callback function
 	glfwSetKeyCallback(window, keyCB);
-
-	VulkanGraphic VK;
-	VERIFY(VK.getPysicalDevices(), "Cannot get physical device.");
 
 	while (!glfwWindowShouldClose(window))
 	{

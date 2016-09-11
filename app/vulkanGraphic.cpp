@@ -1,5 +1,6 @@
 #include "vulkanGraphic.h"
 #include <vector>
+#include <algorithm>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -50,27 +51,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags,
 
 namespace
 {
-	std::vector<const char*> getRequiredExtensions()
-	{
-		std::vector<const char*> extensions;
-
-		unsigned int glfwExtensionCount = 0;
-		const char** glfwExtensions;
-		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-		for (unsigned int i = 0; i < glfwExtensionCount; ++i)
-		{
-			extensions.push_back(glfwExtensions[i]);
-		}
-
-		if (enableValidationLayers)
-		{
-			extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-		}
-
-		return extensions;
-	}
-
 	void setupDebugCallback( const VDeleter<VkInstance>& instance, VDeleter<VkDebugReportCallbackEXT>& callback)
 	{
 		if (!enableValidationLayers) return;
@@ -113,7 +93,7 @@ namespace
 	}
 }
 
-VulkanGraphic::VulkanGraphic()
+VulkanGraphic::VulkanGraphic(std::vector<const char*> instanceExtensions)
 {
 	VkApplicationInfo appInfo = {};
 	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -132,9 +112,10 @@ VulkanGraphic::VulkanGraphic()
 		std::cerr << "Validation layer not supported and will not be enabled." << std::endl;
 	}
 
-	auto extensions = getRequiredExtensions();
-	createInfo.enabledExtensionCount = static_cast< uint32_t >( extensions.size() );
-	createInfo.ppEnabledExtensionNames = extensions.data();
+	if (enableValidationLayers) { instanceExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME); }
+
+	createInfo.enabledExtensionCount = static_cast< uint32_t >(instanceExtensions.size() );
+	createInfo.ppEnabledExtensionNames = instanceExtensions.data();
 
 	if (enableValidationLayers)
 	{
@@ -160,12 +141,12 @@ bool VulkanGraphic::getPysicalDevices()
 
 	int graphicFamily = -1;
 	int presentFamily = -1;
-	std::vector< VkPhysicalDeviceFeatures > features(deviceCount);
-	std::vector< VkPhysicalDeviceProperties > properties(deviceCount);
+	VkPhysicalDeviceFeatures features;
+	VkPhysicalDeviceProperties properties;
 	for (size_t i = 0; i < deviceCount; ++i)
 	{
-		vkGetPhysicalDeviceProperties(devices[i], &_physDevice.properties);
-		vkGetPhysicalDeviceFeatures(devices[i], &_physDevice.features);
+		vkGetPhysicalDeviceProperties(devices[i], &properties);
+		vkGetPhysicalDeviceFeatures(devices[i], &features);
 
 		uint32_t queueFamilyCount = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(devices[i], &queueFamilyCount, nullptr);
@@ -177,7 +158,7 @@ bool VulkanGraphic::getPysicalDevices()
 		for( uint32_t j = 0; j < queueFamilyCount; ++j )
 		{
 			VkBool32 presentationSupported = VK_FALSE;
-			vkGetPhysicalDeviceSurfaceSupportKHR(devices[i], j, VkSurfaceKHR(), &presentationSupported);
+			vkGetPhysicalDeviceSurfaceSupportKHR(devices[i], j, _surface, &presentationSupported);
 			if (queueFamilies[j].queueCount > 0 && queueFamilies[j].queueFlags & VK_QUEUE_GRAPHICS_BIT)
 			{
 				graphicFamily = j;
@@ -192,12 +173,61 @@ bool VulkanGraphic::getPysicalDevices()
 		// We have found the one.
 		if (graphicFamily >= 0 && presentFamily >= 0)
 		{
-			_physDevice.device = devices[i];
-			_physDevice.graphicFamily = graphicFamily;
-			_physDevice.presentationFamily = presentFamily;
+			_physDevice = devices[i];
+
+			_graphicQueue.familyIndex = graphicFamily;
+			_presentationQueue.familyIndex = presentFamily;
 			return true;
 		}
 	}
 
 	return false;
+}
+
+bool VulkanGraphic::createLogicalDevice()
+{
+	std::vector< int > uniqueFamilliesIndex = { _graphicQueue.familyIndex, _presentationQueue.familyIndex };
+	auto last = std::unique(uniqueFamilliesIndex.begin(), uniqueFamilliesIndex.end());
+	uniqueFamilliesIndex.erase(last, uniqueFamilliesIndex.end());
+	std::vector< VkDeviceQueueCreateInfo > queueCreateInfos(uniqueFamilliesIndex.size());
+	const float queuePriority = 1.0f;
+	for (size_t i = 0; i < uniqueFamilliesIndex.size(); ++i)
+	{
+		queueCreateInfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfos[i].queueFamilyIndex = uniqueFamilliesIndex[i];
+		queueCreateInfos[i].queueCount = 1;
+		queueCreateInfos[i].pQueuePriorities = &queuePriority;
+	}
+
+	// No special feature for now.
+	VkPhysicalDeviceFeatures deviceFeatures = {};
+
+	VkDeviceCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+	createInfo.pQueueCreateInfos = queueCreateInfos.data();
+	createInfo.queueCreateInfoCount = static_cast< uint32_t >( queueCreateInfos.size() );
+	createInfo.pEnabledFeatures = &deviceFeatures;
+
+	createInfo.enabledExtensionCount = 0;
+
+	if (enableValidationLayers) {
+		createInfo.enabledLayerCount = static_cast< uint32_t >( VALIDATION_LAYERS.size() );
+		createInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
+	}
+	else {
+		createInfo.enabledLayerCount = 0;
+	}
+
+	VK_CALL(vkCreateDevice(_physDevice, &createInfo, nullptr, &_device));
+
+	// Get the handle of the queue.
+	vkGetDeviceQueue(_device, _graphicQueue.familyIndex, 0, &_graphicQueue.handle);
+
+	return true;
+}
+
+bool VulkanGraphic::createSurface(GLFWwindow* window)
+{
+	VK_CALL(glfwCreateWindowSurface(_instance, window, nullptr, &_surface));
+	return true;
 }
