@@ -2,10 +2,13 @@
 #define VULKAN_GRAPHIC_H_
 
 #include <vulkan\vulkan.h>
+#include "swapChain.h"
 #include <functional>
+#include <memory>
 #include <vector>
 
 struct GLFWwindow;
+class SwapChain;
 
 template <typename T>
 class VDeleter
@@ -69,6 +72,7 @@ public:
 	bool getPysicalDevices();
 	bool createLogicalDevice();
 	bool createSurface(GLFWwindow* window);
+	bool createSwapChain();
 
 private:
 	struct Queue {
@@ -81,6 +85,7 @@ private:
 	Queue _graphicQueue;
 	Queue _presentationQueue;
 	VDeleter<VkSurfaceKHR> _surface{ _instance, vkDestroySurfaceKHR };
+	std::unique_ptr< SwapChain > _swapChain;
 
 	VDeleter<VkDevice> _device{ vkDestroyDevice };
 

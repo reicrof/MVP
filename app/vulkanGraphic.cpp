@@ -1,5 +1,7 @@
 #include "vulkanGraphic.h"
+#include "utils.h"
 #include <vector>
+#include <set>
 #include <algorithm>
 
 #define GLFW_INCLUDE_VULKAN
@@ -17,6 +19,10 @@ if( func != VK_SUCCESS )								 \
 
 const std::vector<const char*> VALIDATION_LAYERS = {
 	"VK_LAYER_LUNARG_standard_validation"
+};
+
+const std::vector<const char*> DEVICE_EXTENSIONS = {
+	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
 #ifdef NDEBUG
@@ -90,6 +96,29 @@ namespace
 		}
 
 		return true;
+	}
+
+	bool isExtensionAvailable(const char* ext, const std::vector<VkExtensionProperties>& extList)
+	{
+		return std::find_if(extList.begin(), extList.end(), 
+							[&ext](const VkExtensionProperties& extension)
+								  { return strcmp(ext, extension.extensionName); }) != extList.end();
+	}
+
+	bool areDeviceExtensionsSupported(const VkPhysicalDevice& device, const std::vector<const char*> extensions)
+	{
+		bool success = true;
+		uint32_t extensionCount;
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+		std::vector< VkExtensionProperties > extensionPropertiesAvailable(extensionCount);
+		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, extensionPropertiesAvailable.data());
+
+		for (const auto& ext : extensions)
+		{
+			success &= isExtensionAvailable(ext, extensionPropertiesAvailable);
+		}
+
+		return success;
 	}
 }
 
@@ -186,17 +215,17 @@ bool VulkanGraphic::getPysicalDevices()
 
 bool VulkanGraphic::createLogicalDevice()
 {
-	std::vector< int > uniqueFamilliesIndex = { _graphicQueue.familyIndex, _presentationQueue.familyIndex };
-	auto last = std::unique(uniqueFamilliesIndex.begin(), uniqueFamilliesIndex.end());
-	uniqueFamilliesIndex.erase(last, uniqueFamilliesIndex.end());
-	std::vector< VkDeviceQueueCreateInfo > queueCreateInfos(uniqueFamilliesIndex.size());
+	std::set< int > uniqueFamilliesIndex = { _graphicQueue.familyIndex, _presentationQueue.familyIndex };
+	std::vector< VkDeviceQueueCreateInfo > queueCreateInfos( uniqueFamilliesIndex.size() );
 	const float queuePriority = 1.0f;
-	for (size_t i = 0; i < uniqueFamilliesIndex.size(); ++i)
+	size_t count = 0;
+	for (auto i = uniqueFamilliesIndex.begin(); i != uniqueFamilliesIndex.end(); ++i )
 	{
-		queueCreateInfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queueCreateInfos[i].queueFamilyIndex = uniqueFamilliesIndex[i];
-		queueCreateInfos[i].queueCount = 1;
-		queueCreateInfos[i].pQueuePriorities = &queuePriority;
+		queueCreateInfos[count].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfos[count].queueFamilyIndex = *i;
+		queueCreateInfos[count].queueCount = 1;
+		queueCreateInfos[count].pQueuePriorities = &queuePriority;
+		++count;
 	}
 
 	// No special feature for now.
@@ -208,7 +237,10 @@ bool VulkanGraphic::createLogicalDevice()
 	createInfo.queueCreateInfoCount = static_cast< uint32_t >( queueCreateInfos.size() );
 	createInfo.pEnabledFeatures = &deviceFeatures;
 
-	createInfo.enabledExtensionCount = 0;
+	VERIFY(areDeviceExtensionsSupported(_physDevice, DEVICE_EXTENSIONS), "Not all extensions are supported.");
+	
+	createInfo.enabledExtensionCount = static_cast< uint32_t >(DEVICE_EXTENSIONS.size() );
+	createInfo.ppEnabledExtensionNames = DEVICE_EXTENSIONS.data();
 
 	if (enableValidationLayers) {
 		createInfo.enabledLayerCount = static_cast< uint32_t >( VALIDATION_LAYERS.size() );
@@ -231,3 +263,10 @@ bool VulkanGraphic::createSurface(GLFWwindow* window)
 	VK_CALL(glfwCreateWindowSurface(_instance, window, nullptr, &_surface));
 	return true;
 }
+
+bool VulkanGraphic::createSwapChain()
+{
+	_swapChain = std::make_unique< SwapChain >(_physDevice, _surface);
+	return true;
+}
+

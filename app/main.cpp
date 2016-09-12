@@ -7,22 +7,12 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "utils.h"
 #include "vulkanGraphic.h"
 
 #include <iostream>
 #include <string>
 #include <assert.h>
-
-template< typename T >
-void VERIFY(T x, const char* msg)
-{
-	if (!x) {
-		char c;
-		std::cerr << msg << std::endl;
-		std::cin >> c;
-		exit(EXIT_FAILURE);
-	}
-}
 
 #define RTLD_LAZY   1
 #define RTLD_NOW    2
@@ -128,6 +118,7 @@ static void initVulkan(GLFWwindow* window)
 	VERIFY(VK.createSurface(window), "Cannot create vulkan surface.");
 	VERIFY(VK.getPysicalDevices(), "Cannot get physical device.");
 	VERIFY(VK.createLogicalDevice(), "Cannot create logical device.");
+	VERIFY(VK.createSwapChain(), "Cannot create swap chain.");
 }
 
 int main()
