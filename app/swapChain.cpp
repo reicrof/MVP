@@ -1,4 +1,9 @@
 #include "swapChain.h"
+#include "utils.h"
+#include "vkUtils.h"
+#include <limits>
+#include <algorithm>
+#include <assert.h>
 
 namespace
 {
@@ -25,11 +30,27 @@ namespace
 			}
 		}
 
-		return 0;
+		return 0;	
+	}
+
+	VkExtent2D selectDefaultExtent( const VkExtent2D& curExt, const VkExtent2D& minExt, const VkExtent2D& maxExt)
+	{
+		if (curExt.width != std::numeric_limits<uint32_t>::max())
+		{
+			return curExt;
+		}
+
+		static const uint32_t WIDTH = 800;
+		static const uint32_t HEIGHT = 600;
+		VkExtent2D extent = { clamp(WIDTH, minExt.width, maxExt.width),
+							  clamp(HEIGHT, minExt.height, maxExt.height) };
+		return extent;
 	}
 }
 
-SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VkSurfaceKHR& surface)
+SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VkDevice& logicalDevice, 
+					  const VkSurfaceKHR& surface, VkSharingMode sharingMode /*= VK_SHARING_MODE_EXCLUSIVE*/)
+	:_deviceUsedForCreation(logicalDevice)
 {
 	VkSurfaceCapabilitiesKHR capabilities = {};
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physDevice, surface, &capabilities);
@@ -53,4 +74,47 @@ SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VkSurfaceKHR& su
 	vkGetPhysicalDeviceSurfacePresentModesKHR(physDevice, surface, &presentModeCount, _presentModes.data());
 
 	_selectedPresentMode = selectDefaultPresentMode(_presentModes);
+
+	_curExtent = selectDefaultExtent(capabilities.currentExtent, capabilities.minImageExtent, capabilities.maxImageExtent);
+	_minExtent = capabilities.minImageExtent;
+	_maxExtent = capabilities.maxImageExtent;
+
+	_imageCount = capabilities.minImageCount + 1;
+	if (capabilities.maxImageCount > 0 && 
+		_imageCount > capabilities.maxImageCount)
+	{
+		_imageCount = capabilities.maxImageCount;
+	}
+
+	// The actual creation of the swap chain
+	VkSwapchainCreateInfoKHR createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	createInfo.surface = surface;
+	createInfo.minImageCount = _imageCount;
+	createInfo.imageFormat = _surfaceFormats[ _selectedSurfaceFormat ].format;
+	createInfo.imageColorSpace = _surfaceFormats[_selectedSurfaceFormat].colorSpace;
+	createInfo.presentMode = _presentModes[_selectedPresentMode];
+	createInfo.imageExtent = _curExtent;
+	createInfo.imageArrayLayers = 1; // Stereoscopic stuff
+	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+	assert(sharingMode == VK_SHARING_MODE_EXCLUSIVE);
+	createInfo.imageSharingMode = sharingMode;
+	createInfo.queueFamilyIndexCount = 0;
+	createInfo.pQueueFamilyIndices = nullptr;
+
+	createInfo.preTransform = capabilities.currentTransform;
+	createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	createInfo.clipped = VK_TRUE;
+	createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+	VK_CALL(vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &_handle));
+}
+
+SwapChain::~SwapChain()
+{
+	if (_handle != VK_NULL_HANDLE)
+	{
+		vkDestroySwapchainKHR(_deviceUsedForCreation, _handle, nullptr);
+	}
 }

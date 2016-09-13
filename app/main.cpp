@@ -106,15 +106,8 @@ void updateCoreDll()
 	}
 }
 
-static void initVulkan(GLFWwindow* window)
+static void initVulkan(VulkanGraphic& VK, GLFWwindow* window)
 {
-	unsigned int glfwExtensionCount = 0;
-	const char** glfwExtensions;
-	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-	std::vector< const char* > extensions(glfwExtensionCount);
-	std::copy(glfwExtensions, glfwExtensions + glfwExtensionCount, extensions.begin());
-
-	VulkanGraphic VK(extensions);
 	VERIFY(VK.createSurface(window), "Cannot create vulkan surface.");
 	VERIFY(VK.getPysicalDevices(), "Cannot get physical device.");
 	VERIFY(VK.createLogicalDevice(), "Cannot create logical device.");
@@ -133,7 +126,14 @@ int main()
 
 	VERIFY(window, "Could not create GLFW window.");
 
-	initVulkan( window );
+	unsigned int glfwExtensionCount = 0;
+	const char** glfwExtensions;
+	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+	std::vector< const char* > extensions(glfwExtensionCount);
+	std::copy(glfwExtensions, glfwExtensions + glfwExtensionCount, extensions.begin());
+
+	VulkanGraphic VK(extensions);
+	initVulkan( VK, window );
 
 	// Setup callback function
 	glfwSetKeyCallback(window, keyCB);

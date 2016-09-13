@@ -3,19 +3,11 @@
 #include <vector>
 #include <set>
 #include <algorithm>
+#include <iostream>
+#include <assert.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-
-#include <iostream>
-#include <assert.h>
-#define VK_CALL(func)									 \
-if( func != VK_SUCCESS )								 \
-{														 \
-	std::cerr << "Error when calling " << #func << " at "\
-	<< __FILE__ << ":" << __LINE__ << std::endl;		 \
-	assert( false );									 \
-}
 
 const std::vector<const char*> VALIDATION_LAYERS = {
 	"VK_LAYER_LUNARG_standard_validation"
@@ -266,7 +258,7 @@ bool VulkanGraphic::createSurface(GLFWwindow* window)
 
 bool VulkanGraphic::createSwapChain()
 {
-	_swapChain = std::make_unique< SwapChain >(_physDevice, _surface);
+	_swapChain = std::make_unique< SwapChain >(_physDevice, _device, _surface);
 	return true;
 }
 
