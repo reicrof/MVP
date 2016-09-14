@@ -1,16 +1,16 @@
 #ifndef SWAP_CHAIN_H_
 #define SWAP_CHAIN_H_
+#include "vkUtils.h"
 #include <vector>
 #include <vulkan\vulkan.h>
 
 class SwapChain
 {
 public:
-	SwapChain( const VkPhysicalDevice& physDevice, const VkDevice& logicalDevice,
-			   const VkSurfaceKHR& surface, VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE );
-	~SwapChain();
+	SwapChain(const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& logicalDevice,
+			   const VDeleter<VkSurfaceKHR>& surface, VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE );
 
-	VkSwapchainKHR _handle;
+	VDeleter< VkSwapchainKHR > _handle;
 	VkExtent2D _curExtent;
 	VkExtent2D _minExtent;
 	VkExtent2D _maxExtent;
@@ -22,8 +22,6 @@ public:
 	size_t _selectedPresentMode = 0;
 
 	uint32_t _imageCount;
-private:
-	const VkDevice& _deviceUsedForCreation;
 };
 
 #endif // SWAP_CHAIN_H_

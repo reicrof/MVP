@@ -1,6 +1,5 @@
 #include "swapChain.h"
 #include "utils.h"
-#include "vkUtils.h"
 #include <limits>
 #include <algorithm>
 #include <assert.h>
@@ -48,9 +47,9 @@ namespace
 	}
 }
 
-SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VkDevice& logicalDevice, 
-					  const VkSurfaceKHR& surface, VkSharingMode sharingMode /*= VK_SHARING_MODE_EXCLUSIVE*/)
-	:_deviceUsedForCreation(logicalDevice)
+SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& logicalDevice,
+					  const VDeleter<VkSurfaceKHR>& surface, VkSharingMode sharingMode /*= VK_SHARING_MODE_EXCLUSIVE*/)
+	: _handle{ logicalDevice, vkDestroySwapchainKHR }
 {
 	VkSurfaceCapabilitiesKHR capabilities = {};
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physDevice, surface, &capabilities);
@@ -109,12 +108,4 @@ SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VkDevice& logica
 	createInfo.oldSwapchain = VK_NULL_HANDLE;
 
 	VK_CALL(vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &_handle));
-}
-
-SwapChain::~SwapChain()
-{
-	if (_handle != VK_NULL_HANDLE)
-	{
-		vkDestroySwapchainKHR(_deviceUsedForCreation, _handle, nullptr);
-	}
 }

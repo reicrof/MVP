@@ -115,7 +115,7 @@ static void initVulkan(VulkanGraphic& VK, GLFWwindow* window)
 }
 
 int main()
-{	
+{
 	VERIFY(glfwInit(), "Cannot init glfw.");
 	VERIFY(glfwVulkanSupported(), "Vulkan not supported.");
 
@@ -133,7 +133,7 @@ int main()
 	std::copy(glfwExtensions, glfwExtensions + glfwExtensionCount, extensions.begin());
 
 	VulkanGraphic VK(extensions);
-	initVulkan( VK, window );
+	initVulkan(VK, window);
 
 	// Setup callback function
 	glfwSetKeyCallback(window, keyCB);
@@ -146,6 +146,5 @@ int main()
 	}
 
 	glfwDestroyWindow(window);
-
 	glfwTerminate();
 }

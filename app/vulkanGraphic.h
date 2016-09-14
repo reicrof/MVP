@@ -30,13 +30,12 @@ private:
 	};
 
 	VDeleter<VkInstance> _instance{ vkDestroyInstance };
+	VDeleter<VkDevice> _device{ vkDestroyDevice };
 	VkPhysicalDevice _physDevice;
 	Queue _graphicQueue;
 	Queue _presentationQueue;
 	VDeleter<VkSurfaceKHR> _surface{ _instance, vkDestroySurfaceKHR };
 	std::unique_ptr< SwapChain > _swapChain;
-
-	VDeleter<VkDevice> _device{ vkDestroyDevice };
 
 	VDeleter<VkDebugReportCallbackEXT> _validationCallback{ _instance, DestroyDebugReportCallbackEXT };
 };
