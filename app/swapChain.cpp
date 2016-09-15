@@ -78,18 +78,18 @@ SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VDeleter<VkDevic
 	_minExtent = capabilities.minImageExtent;
 	_maxExtent = capabilities.maxImageExtent;
 
-	_imageCount = capabilities.minImageCount + 1;
+	uint32_t requestedImageCount = capabilities.minImageCount + 1;
 	if (capabilities.maxImageCount > 0 && 
-		_imageCount > capabilities.maxImageCount)
+		requestedImageCount > capabilities.maxImageCount)
 	{
-		_imageCount = capabilities.maxImageCount;
+		requestedImageCount = capabilities.maxImageCount;
 	}
 
 	// The actual creation of the swap chain
 	VkSwapchainCreateInfoKHR createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	createInfo.surface = surface;
-	createInfo.minImageCount = _imageCount;
+	createInfo.minImageCount = requestedImageCount;
 	createInfo.imageFormat = _surfaceFormats[ _selectedSurfaceFormat ].format;
 	createInfo.imageColorSpace = _surfaceFormats[_selectedSurfaceFormat].colorSpace;
 	createInfo.presentMode = _presentModes[_selectedPresentMode];
@@ -108,4 +108,30 @@ SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VDeleter<VkDevic
 	createInfo.oldSwapchain = VK_NULL_HANDLE;
 
 	VK_CALL(vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &_handle));
+
+	vkGetSwapchainImagesKHR(logicalDevice, _handle, &_imageCount, nullptr);
+	_images.resize(_imageCount);
+	vkGetSwapchainImagesKHR(logicalDevice, _handle, &_imageCount, _images.data());
+
+	// Create image views
+	_imageViews.resize(_imageCount, VDeleter<VkImageView>{logicalDevice, vkDestroyImageView});
+	VkImageViewCreateInfo imgCreateInfo = {};
+	imgCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	imgCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	imgCreateInfo.format = _surfaceFormats[_selectedSurfaceFormat].format;
+	imgCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imgCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imgCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imgCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	imgCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	imgCreateInfo.subresourceRange.baseMipLevel = 0;
+	imgCreateInfo.subresourceRange.levelCount = 1;
+	imgCreateInfo.subresourceRange.baseArrayLayer = 0;
+	imgCreateInfo.subresourceRange.layerCount = 1;
+	for (uint32_t i = 0; i < _imageCount; ++i)
+	{
+		imgCreateInfo.image = _images[i];
+		VK_CALL(vkCreateImageView(logicalDevice, &imgCreateInfo, nullptr, &_imageViews[i]) );
+	}
+
 }

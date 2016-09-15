@@ -22,6 +22,8 @@ public:
 	size_t _selectedPresentMode = 0;
 
 	uint32_t _imageCount;
+	std::vector<VkImage> _images;
+	std::vector<VDeleter<VkImageView>> _imageViews;
 };
 
 #endif // SWAP_CHAIN_H_
