@@ -22,6 +22,7 @@ public:
 	bool createLogicalDevice();
 	bool createSurface(GLFWwindow* window);
 	bool createSwapChain();
+	bool createPipeline();
 
 private:
 	struct Queue {
@@ -36,8 +37,11 @@ private:
 	Queue _presentationQueue;
 	VDeleter<VkSurfaceKHR> _surface{ _instance, vkDestroySurfaceKHR };
 	std::unique_ptr< SwapChain > _swapChain;
+	VDeleter<VkPipelineLayout> _pipelineLayout{ _device, vkDestroyPipelineLayout };
 
 	VDeleter<VkDebugReportCallbackEXT> _validationCallback{ _instance, DestroyDebugReportCallbackEXT };
+
+	bool createShaderModule(const std::string& shaderPath, VDeleter<VkShaderModule>& shaderModule );
 };
 
 #endif //VULKAN_GRAPHIC_H_
