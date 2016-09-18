@@ -10,6 +10,16 @@ public:
 	SwapChain(const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& logicalDevice,
 			   const VDeleter<VkSurfaceKHR>& surface, VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE );
 
+	inline VkFormat getCurrentFormat() const
+	{
+		return _surfaceFormats[_selectedSurfaceFormat].format;
+	}
+
+	inline VkColorSpaceKHR getCurrentColorSpace() const
+	{
+		return _surfaceFormats[_selectedSurfaceFormat].colorSpace;
+	}
+
 	VDeleter< VkSwapchainKHR > _handle;
 	VkExtent2D _curExtent;
 	VkExtent2D _minExtent;

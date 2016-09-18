@@ -112,6 +112,7 @@ static void initVulkan(VulkanGraphic& VK, GLFWwindow* window)
 	VERIFY(VK.getPysicalDevices(), "Cannot get physical device.");
 	VERIFY(VK.createLogicalDevice(), "Cannot create logical device.");
 	VERIFY(VK.createSwapChain(), "Cannot create swap chain.");
+	VERIFY(VK.createRenderPass(), "Cannot create a render pass.");
 	VERIFY(VK.createPipeline(), "Cannot create the pipeline.");
 }
 

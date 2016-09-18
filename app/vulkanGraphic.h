@@ -22,6 +22,7 @@ public:
 	bool createLogicalDevice();
 	bool createSurface(GLFWwindow* window);
 	bool createSwapChain();
+	bool createRenderPass();
 	bool createPipeline();
 
 private:
@@ -37,7 +38,9 @@ private:
 	Queue _presentationQueue;
 	VDeleter<VkSurfaceKHR> _surface{ _instance, vkDestroySurfaceKHR };
 	std::unique_ptr< SwapChain > _swapChain;
+	VDeleter<VkRenderPass> _renderPass{ _device, vkDestroyRenderPass };
 	VDeleter<VkPipelineLayout> _pipelineLayout{ _device, vkDestroyPipelineLayout };
+	VDeleter<VkPipeline> _graphicsPipeline{ _device, vkDestroyPipeline };
 
 	VDeleter<VkDebugReportCallbackEXT> _validationCallback{ _instance, DestroyDebugReportCallbackEXT };
 

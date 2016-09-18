@@ -90,8 +90,8 @@ SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VDeleter<VkDevic
 	createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	createInfo.surface = surface;
 	createInfo.minImageCount = requestedImageCount;
-	createInfo.imageFormat = _surfaceFormats[ _selectedSurfaceFormat ].format;
-	createInfo.imageColorSpace = _surfaceFormats[_selectedSurfaceFormat].colorSpace;
+	createInfo.imageFormat = getCurrentFormat();
+	createInfo.imageColorSpace = getCurrentColorSpace();
 	createInfo.presentMode = _presentModes[_selectedPresentMode];
 	createInfo.imageExtent = _curExtent;
 	createInfo.imageArrayLayers = 1; // Stereoscopic stuff
@@ -118,7 +118,7 @@ SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VDeleter<VkDevic
 	VkImageViewCreateInfo imgCreateInfo = {};
 	imgCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	imgCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	imgCreateInfo.format = _surfaceFormats[_selectedSurfaceFormat].format;
+	imgCreateInfo.format = getCurrentFormat();
 	imgCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 	imgCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 	imgCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
