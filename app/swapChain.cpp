@@ -48,8 +48,8 @@ namespace
 }
 
 SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& logicalDevice,
-					  const VDeleter<VkSurfaceKHR>& surface, VkSharingMode sharingMode /*= VK_SHARING_MODE_EXCLUSIVE*/)
-	: _handle{ logicalDevice, vkDestroySwapchainKHR }
+					  const VDeleter<VkSurfaceKHR>& surface, VkSharingMode sharingMode /*= VK_SHARING_MODE_EXCLUSIVE*/,
+	                  VkSwapchainKHR oldSwapChain) : _handle{ logicalDevice, vkDestroySwapchainKHR }
 {
 	VkSurfaceCapabilitiesKHR capabilities = {};
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physDevice, surface, &capabilities);
@@ -105,7 +105,7 @@ SwapChain::SwapChain( const VkPhysicalDevice& physDevice, const VDeleter<VkDevic
 	createInfo.preTransform = capabilities.currentTransform;
 	createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	createInfo.clipped = VK_TRUE;
-	createInfo.oldSwapchain = VK_NULL_HANDLE;
+	createInfo.oldSwapchain = oldSwapChain;
 
 	VK_CALL(vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &_handle));
 

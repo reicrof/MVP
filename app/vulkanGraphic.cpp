@@ -116,6 +116,15 @@ namespace
 	}
 } // End of anonymous namespace
 
+void VulkanGraphic::recreateSwapChain()
+{
+	vkDeviceWaitIdle(_device);
+	_swapChain.reset(new SwapChain(_physDevice, _device, _surface, VK_SHARING_MODE_EXCLUSIVE, _swapChain->_handle));
+	createPipeline();
+	createFrameBuffers();
+	createCommandBuffers();
+}
+
 VulkanGraphic::VulkanGraphic(std::vector<const char*> instanceExtensions)
 {
 	VkApplicationInfo appInfo = {};
@@ -152,6 +161,17 @@ VulkanGraphic::VulkanGraphic(std::vector<const char*> instanceExtensions)
 
 	VK_CALL( vkCreateInstance(&createInfo, nullptr, &_instance) );
 	setupDebugCallback(_instance, _validationCallback, _outErrorFile);
+}
+
+void VulkanGraphic::verifySwapChain(VkResult res)
+{
+	switch (res)
+	{
+	case VK_SUBOPTIMAL_KHR:
+	case VK_ERROR_OUT_OF_DATE_KHR:
+		recreateSwapChain();
+		break;
+	}
 }
 
 bool VulkanGraphic::getPysicalDevices()
@@ -286,13 +306,6 @@ bool VulkanGraphic::createRenderPass()
 	subPass.colorAttachmentCount = 1;
 	subPass.pColorAttachments = &colorAttachmentRef;
 
-	//VkSubpassDependency dependency = {};
-	//dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	//dependency.dstSubpass = 0;
-	//dependency.srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	//dependency.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	//dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	//dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 	std::vector< VkSubpassDependency > subpassDependencies =
 	{
 		{
@@ -388,24 +401,26 @@ bool VulkanGraphic::createPipeline()
 	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-	VkViewport viewport = {};
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = static_cast< float >( _swapChain->_curExtent.width );
-	viewport.height = static_cast< float >( _swapChain->_curExtent.height );
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
+	// Dynamic states
+	std::vector< VkDynamicState > dynamicStates =
+	{
+		VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR
+	};
 
-	VkRect2D scissor = {};
-	scissor.offset = { 0, 0 };
-	scissor.extent = _swapChain->_curExtent;
-
+	VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo =
+	{
+		VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		nullptr, 0,
+		static_cast< uint32_t >(dynamicStates.size()),
+		dynamicStates.data()
+	};
+	
 	VkPipelineViewportStateCreateInfo viewportState = {};
 	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 	viewportState.viewportCount = 1;
-	viewportState.pViewports = &viewport;
+	viewportState.pViewports = nullptr;
 	viewportState.scissorCount = 1;
-	viewportState.pScissors = &scissor;
+	viewportState.pScissors = nullptr;
 
 	VkPipelineRasterizationStateCreateInfo rasterizer = {};
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -456,7 +471,7 @@ bool VulkanGraphic::createPipeline()
 	pipelineInfo.pMultisampleState = &multisampling;
 	pipelineInfo.pDepthStencilState = nullptr; // Optional
 	pipelineInfo.pColorBlendState = &colorBlending;
-	pipelineInfo.pDynamicState = nullptr; // Optional
+	pipelineInfo.pDynamicState = &dynamicStateCreateInfo;
 	pipelineInfo.layout = _pipelineLayout;
 	pipelineInfo.renderPass = _renderPass;
 	pipelineInfo.subpass = 0;
@@ -504,6 +519,11 @@ bool VulkanGraphic::createCommandPool()
 
 bool VulkanGraphic::createCommandBuffers()
 {
+	if (_commandBuffers.size() > 0)
+	{
+		vkFreeCommandBuffers(_device, _commandPool, static_cast< uint32_t >( _commandBuffers.size() ), _commandBuffers.data());
+	}
+
 	_commandBuffers.resize(_swapChain->_imageCount);
 
 	VkCommandBufferAllocateInfo allocInfo = {};
@@ -537,6 +557,14 @@ bool VulkanGraphic::createCommandBuffers()
 		vkCmdBeginRenderPass(_commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 			vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
+			
+			VkViewport viewport = { 0.0f, 0.0f, static_cast<float>(_swapChain->_curExtent.width),
+									static_cast<float>(_swapChain->_curExtent.height), 0.0f, 1.0f };
+
+			VkRect2D scissor = { { 0, 0 },{ _swapChain->_curExtent.width, _swapChain->_curExtent.height } };
+
+			vkCmdSetViewport(_commandBuffers[i], 0, 1, &viewport);
+			vkCmdSetScissor(_commandBuffers[i], 0, 1, &scissor);
 
 			vkCmdDraw(_commandBuffers[i], 3, 1, 0, 0);
 
@@ -560,7 +588,9 @@ void VulkanGraphic::render()
 {
 	// Acquire the next image from the swap chain
 	uint32_t imageIndex;
-	vkAcquireNextImageKHR(_device, _swapChain->_handle, std::numeric_limits<uint64_t>::max(), _imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+	VkResult res = vkAcquireNextImageKHR(_device, _swapChain->_handle, std::numeric_limits<uint64_t>::max(), 
+					                     _imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+	verifySwapChain(res);
 
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -591,7 +621,8 @@ void VulkanGraphic::render()
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = nullptr;
 
-	vkQueuePresentKHR(_presentationQueue.handle, &presentInfo);
+	VkResult res = vkQueuePresentKHR(_presentationQueue.handle, &presentInfo);
+	verifySwapChain(res);
 }
 
 VulkanGraphic::~VulkanGraphic()

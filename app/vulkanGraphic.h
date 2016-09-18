@@ -31,12 +31,16 @@ public:
 	bool createSemaphores();
 
 	void render();
+	void recreateSwapChain();
 
 private:
 	struct Queue {
 		int familyIndex;
 		VkQueue handle;
 	};
+
+	bool createShaderModule(const std::string& shaderPath, VDeleter<VkShaderModule>& shaderModule);
+	void verifySwapChain(VkResult res);
 
 	VDeleter<VkInstance> _instance{ vkDestroyInstance };
 	VDeleter<VkDevice> _device{ vkDestroyDevice };
@@ -57,8 +61,6 @@ private:
 
 	VDeleter<VkDebugReportCallbackEXT> _validationCallback{ _instance, DestroyDebugReportCallbackEXT };
 	std::ofstream _outErrorFile;
-
-	bool createShaderModule(const std::string& shaderPath, VDeleter<VkShaderModule>& shaderModule );
 };
 
 #endif //VULKAN_GRAPHIC_H_

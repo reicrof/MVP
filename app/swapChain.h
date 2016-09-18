@@ -7,8 +7,9 @@
 class SwapChain
 {
 public:
-	SwapChain(const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& logicalDevice,
-			   const VDeleter<VkSurfaceKHR>& surface, VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE );
+	SwapChain( const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& logicalDevice,
+			   const VDeleter<VkSurfaceKHR>& surface, VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+			   VkSwapchainKHR oldSwapChain = VK_NULL_HANDLE );
 
 	inline VkFormat getCurrentFormat() const
 	{

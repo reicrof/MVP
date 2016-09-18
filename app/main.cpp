@@ -98,6 +98,15 @@ static void keyCB(GLFWwindow* window, int key, int scancode, int action, int mod
 	}
 }
 
+static void onWindowResized(GLFWwindow* window, int width, int height)
+{
+	if (width > 0 && height > 0)
+	{
+		VulkanGraphic* VK = reinterpret_cast<VulkanGraphic*>(glfwGetWindowUserPointer(window));
+		VK->recreateSwapChain();
+	}
+}
+
 void updateCoreDll()
 {
 	if (shouldReloadCoreLib())
@@ -143,6 +152,8 @@ int main()
 
 	// Setup callback function
 	glfwSetKeyCallback(window, keyCB);
+	glfwSetWindowUserPointer(window, &VK); // Set user data
+	glfwSetWindowSizeCallback(window, onWindowResized);
 
 	while (!glfwWindowShouldClose(window))
 	{
