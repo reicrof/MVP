@@ -6,6 +6,7 @@
 #include "swapChain.h"
 #include <memory>
 #include <vector>
+#include <fstream>
 
 struct GLFWwindow;
 class SwapChain;
@@ -16,7 +17,7 @@ class VulkanGraphic
 {
 public:
 	VulkanGraphic(std::vector<const char*> instanceExtensions);
-	~VulkanGraphic() = default;
+	~VulkanGraphic();
 
 	bool getPysicalDevices();
 	bool createLogicalDevice();
@@ -24,6 +25,12 @@ public:
 	bool createSwapChain();
 	bool createRenderPass();
 	bool createPipeline();
+	bool createFrameBuffers();
+	bool createCommandPool();
+	bool createCommandBuffers();
+	bool createSemaphores();
+
+	void render();
 
 private:
 	struct Queue {
@@ -41,8 +48,15 @@ private:
 	VDeleter<VkRenderPass> _renderPass{ _device, vkDestroyRenderPass };
 	VDeleter<VkPipelineLayout> _pipelineLayout{ _device, vkDestroyPipelineLayout };
 	VDeleter<VkPipeline> _graphicsPipeline{ _device, vkDestroyPipeline };
+	std::vector<VDeleter<VkFramebuffer>> _framebuffers;
+	VDeleter<VkCommandPool> _commandPool{ _device, vkDestroyCommandPool };
+	std::vector<VkCommandBuffer> _commandBuffers;
+
+	VDeleter<VkSemaphore> _imageAvailableSemaphore{ _device, vkDestroySemaphore };
+	VDeleter<VkSemaphore> _renderFinishedSemaphore{ _device, vkDestroySemaphore };
 
 	VDeleter<VkDebugReportCallbackEXT> _validationCallback{ _instance, DestroyDebugReportCallbackEXT };
+	std::ofstream _outErrorFile;
 
 	bool createShaderModule(const std::string& shaderPath, VDeleter<VkShaderModule>& shaderModule );
 };

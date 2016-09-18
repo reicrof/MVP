@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <iostream>
 #include <assert.h>
-#include <fstream>
 #include <string>
 
 #define GLFW_INCLUDE_VULKAN
@@ -45,13 +44,14 @@ void DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char* layerPrefix, const char* msg, void* userData) {
 	std::cerr << "validation layer: " << msg << std::endl;
-
+	(*static_cast< std::ofstream* >( userData ))  << msg << std::endl;
 	return VK_FALSE;
 }
 
 namespace
 {
-	void setupDebugCallback( const VDeleter<VkInstance>& instance, VDeleter<VkDebugReportCallbackEXT>& callback)
+	void setupDebugCallback( const VDeleter<VkInstance>& instance, VDeleter<VkDebugReportCallbackEXT>& callback,
+							 std::ofstream& outErrorFile )
 	{
 		if (!enableValidationLayers) return;
 
@@ -59,10 +59,10 @@ namespace
 		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
 		createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
 		createInfo.pfnCallback = debugCallback;
+		createInfo.pUserData = &outErrorFile;
 
-		if (CreateDebugReportCallbackEXT(instance, &createInfo, nullptr, &callback) != VK_SUCCESS) {
-			throw std::runtime_error("failed to set up debug callback!");
-		}
+		VK_CALL(CreateDebugReportCallbackEXT(instance, &createInfo, nullptr, &callback));
+		outErrorFile = std::ofstream("VulkanErrors.txt");
 	}
 
 	bool checkValidationLayerSupport()
@@ -151,7 +151,7 @@ VulkanGraphic::VulkanGraphic(std::vector<const char*> instanceExtensions)
 	}
 
 	VK_CALL( vkCreateInstance(&createInfo, nullptr, &_instance) );
-	setupDebugCallback(_instance, _validationCallback);
+	setupDebugCallback(_instance, _validationCallback, _outErrorFile);
 }
 
 bool VulkanGraphic::getPysicalDevices()
@@ -248,6 +248,7 @@ bool VulkanGraphic::createLogicalDevice()
 
 	// Get the handle of the queue.
 	vkGetDeviceQueue(_device, _graphicQueue.familyIndex, 0, &_graphicQueue.handle);
+	vkGetDeviceQueue(_device, _presentationQueue.familyIndex, 0, &_presentationQueue.handle);
 
 	return true;
 }
@@ -285,14 +286,71 @@ bool VulkanGraphic::createRenderPass()
 	subPass.colorAttachmentCount = 1;
 	subPass.pColorAttachments = &colorAttachmentRef;
 
+	//VkSubpassDependency dependency = {};
+	//dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	//dependency.dstSubpass = 0;
+	//dependency.srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	//dependency.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	//dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	//dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	std::vector< VkSubpassDependency > subpassDependencies =
+	{
+		{
+			VK_SUBPASS_EXTERNAL,                            // uint32_t  before subpass
+			0,                                              // uint32_t  current subpass
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,           // VkPipelineStageFlags           srcStageMask
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  // VkPipelineStageFlags           dstStageMask
+			VK_ACCESS_MEMORY_READ_BIT,                      // VkAccessFlags                  srcAccessMask
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,           // VkAccessFlags                  dstAccessMask
+			VK_DEPENDENCY_BY_REGION_BIT                     // VkDependencyFlags              dependencyFlags
+		},
+		{
+			0,                                              // uint32_t  current subpass
+			VK_SUBPASS_EXTERNAL,                            // uint32_t  after subpass
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  // VkPipelineStageFlags           srcStageMask
+			VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,           // VkPipelineStageFlags           dstStageMask
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,           // VkAccessFlags                  srcAccessMask
+			VK_ACCESS_MEMORY_READ_BIT,                      // VkAccessFlags                  dstAccessMask
+			VK_DEPENDENCY_BY_REGION_BIT                     // VkDependencyFlags              dependencyFlags
+		}
+	};
+
 	VkRenderPassCreateInfo renderPassInfo = {};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	renderPassInfo.attachmentCount = 1;
 	renderPassInfo.pAttachments = &colorAttachment;
 	renderPassInfo.subpassCount = 1;
 	renderPassInfo.pSubpasses = &subPass;
+	renderPassInfo.dependencyCount = static_cast< uint32_t >( subpassDependencies.size() );
+	renderPassInfo.pDependencies = subpassDependencies.data();
 
 	VK_CALL(vkCreateRenderPass(_device, &renderPassInfo, nullptr, &_renderPass));
+
+	return true;
+}
+
+bool VulkanGraphic::createShaderModule(const std::string& shaderPath, VDeleter<VkShaderModule>& shaderModule)
+{
+	std::vector<char> shaderSource(std::istreambuf_iterator< char >{ std::ifstream(shaderPath, std::ios::binary) }, std::istreambuf_iterator< char >{});
+	if (shaderSource.empty())
+	{
+		std::cerr << "Cannot find shader : " << shaderPath << std::endl;
+		return false;
+	}
+
+	VkShaderModuleCreateInfo shaderModuleCreateInfo =
+	{
+		VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		nullptr, 0,
+		shaderSource.size(),
+		reinterpret_cast<const uint32_t*>(shaderSource.data())
+	};
+
+	if (vkCreateShaderModule(_device, &shaderModuleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS)
+	{
+		std::cerr << "Error while creating shader module for shader : " << shaderPath << std::endl;
+		return false;
+	}
 
 	return true;
 }
@@ -386,8 +444,6 @@ bool VulkanGraphic::createPipeline()
 
 	VK_CALL(vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &_pipelineLayout));
 
-
-
 	VkGraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipelineInfo.stageCount = 2;
@@ -412,28 +468,133 @@ bool VulkanGraphic::createPipeline()
 	return true;
 }
 
-bool VulkanGraphic::createShaderModule(const std::string& shaderPath, VDeleter<VkShaderModule>& shaderModule)
+bool VulkanGraphic::createFrameBuffers()
 {
-	std::vector<char> shaderSource(std::istreambuf_iterator< char >{ std::ifstream(shaderPath, std::ios::binary) }, std::istreambuf_iterator< char >{});
-	if (shaderSource.empty())
+	_framebuffers.resize(_swapChain->_imageCount, VDeleter<VkFramebuffer>{ _device, vkDestroyFramebuffer });
+	for (uint32_t i = 0; i < _swapChain->_imageCount; ++i)
 	{
-		std::cerr << "Cannot find shader : " << shaderPath << std::endl;
-		return false;
-	}
+		VkImageView attachments[] = { _swapChain->_imageViews[i] };
 
-	VkShaderModuleCreateInfo shaderModuleCreateInfo =
-	{
-		VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		nullptr, 0,
-		shaderSource.size(),
-		reinterpret_cast<const uint32_t*>(shaderSource.data())
-	};
+		VkFramebufferCreateInfo framebufferInfo = {};
+		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferInfo.renderPass = _renderPass;
+		framebufferInfo.attachmentCount = 1;
+		framebufferInfo.pAttachments = attachments;
+		framebufferInfo.width = _swapChain->_curExtent.width;
+		framebufferInfo.height = _swapChain->_curExtent.height;
+		framebufferInfo.layers = 1;
 
-	if (vkCreateShaderModule(_device, &shaderModuleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS)
-	{
-		std::cerr << "Error while creating shader module for shader : " << shaderPath << std::endl;
-		return false;
+		VK_CALL(vkCreateFramebuffer(_device, &framebufferInfo, nullptr, &_framebuffers[i]));
 	}
 
 	return true;
+}
+
+bool VulkanGraphic::createCommandPool()
+{
+	VkCommandPoolCreateInfo poolInfo = {};
+	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	poolInfo.queueFamilyIndex = _graphicQueue.familyIndex;
+	poolInfo.flags = 0; // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT or VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
+
+	VK_CALL(vkCreateCommandPool(_device, &poolInfo, nullptr, &_commandPool));
+
+	return true;
+}
+
+bool VulkanGraphic::createCommandBuffers()
+{
+	_commandBuffers.resize(_swapChain->_imageCount);
+
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = _commandPool;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = _swapChain->_imageCount;
+
+	VK_CALL(vkAllocateCommandBuffers(_device, &allocInfo, _commandBuffers.data()));
+
+	for (size_t i = 0; i < _commandBuffers.size(); i++)
+	{
+		VkCommandBufferBeginInfo beginInfo = {};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+		beginInfo.pInheritanceInfo = nullptr;
+
+		vkBeginCommandBuffer(_commandBuffers[i], &beginInfo);
+
+		VkRenderPassBeginInfo renderPassInfo = {};
+		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassInfo.renderPass = _renderPass;
+		renderPassInfo.framebuffer = _framebuffers[i];
+		renderPassInfo.renderArea.offset = { 0, 0 };
+		renderPassInfo.renderArea.extent = _swapChain->_curExtent;
+
+		VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+		renderPassInfo.clearValueCount = 1;
+		renderPassInfo.pClearValues = &clearColor;
+
+		vkCmdBeginRenderPass(_commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+			vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
+
+			vkCmdDraw(_commandBuffers[i], 3, 1, 0, 0);
+
+		vkCmdEndRenderPass(_commandBuffers[i]);
+
+		VK_CALL(vkEndCommandBuffer(_commandBuffers[i]));
+	}
+	
+	return true;
+}
+
+bool VulkanGraphic::createSemaphores()
+{
+	VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+	VK_CALL(vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_imageAvailableSemaphore));
+	VK_CALL(vkCreateSemaphore(_device, &semaphoreInfo, nullptr, &_renderFinishedSemaphore));
+	return true;
+}
+
+void VulkanGraphic::render()
+{
+	// Acquire the next image from the swap chain
+	uint32_t imageIndex;
+	vkAcquireNextImageKHR(_device, _swapChain->_handle, std::numeric_limits<uint64_t>::max(), _imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+	VkSemaphore waitSemaphores[] = { _imageAvailableSemaphore };
+	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = waitSemaphores;
+	submitInfo.pWaitDstStageMask = waitStages;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &_commandBuffers[imageIndex];
+
+	VkSemaphore renderingFinisehdSemaphore[] = { _renderFinishedSemaphore };
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = renderingFinisehdSemaphore;
+
+	VK_CALL(vkQueueSubmit(_graphicQueue.handle, 1, &submitInfo, VK_NULL_HANDLE));
+
+	VkPresentInfoKHR presentInfo = {};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = renderingFinisehdSemaphore;
+
+	VkSwapchainKHR swapChains[] = { _swapChain->_handle };
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = swapChains;
+	presentInfo.pImageIndices = &imageIndex;
+	presentInfo.pResults = nullptr;
+
+	vkQueuePresentKHR(_presentationQueue.handle, &presentInfo);
+}
+
+VulkanGraphic::~VulkanGraphic()
+{
+	vkDeviceWaitIdle(_device);
 }

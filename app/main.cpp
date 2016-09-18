@@ -114,6 +114,10 @@ static void initVulkan(VulkanGraphic& VK, GLFWwindow* window)
 	VERIFY(VK.createSwapChain(), "Cannot create swap chain.");
 	VERIFY(VK.createRenderPass(), "Cannot create a render pass.");
 	VERIFY(VK.createPipeline(), "Cannot create the pipeline.");
+	VERIFY(VK.createFrameBuffers(), "Cannot create frame buffer.");
+	VERIFY(VK.createCommandPool(), "Cannot create frame buffer.");
+	VERIFY(VK.createCommandBuffers(), "Cannot create frame buffer.");
+	VERIFY(VK.createSemaphores(), "Cannot create semaphores");
 }
 
 int main()
@@ -144,7 +148,8 @@ int main()
 	{
 		updateCoreDll();
 		glfwPollEvents();
-		std::cout << ptr() << std::endl;
+		//std::cout << ptr() << std::endl;
+		VK.render();
 	}
 
 	glfwDestroyWindow(window);
