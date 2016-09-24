@@ -114,6 +114,20 @@ namespace
 
 		return success;
 	}
+
+	uint32_t findMemoryType(const VkPhysicalDevice& physDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties)
+	{
+		VkPhysicalDeviceMemoryProperties memProperties;
+		vkGetPhysicalDeviceMemoryProperties(physDevice, &memProperties);
+		for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
+		{
+			if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
 } // End of anonymous namespace
 
 void VulkanGraphic::recreateSwapChain()
@@ -163,7 +177,7 @@ VulkanGraphic::VulkanGraphic(std::vector<const char*> instanceExtensions)
 	setupDebugCallback(_instance, _validationCallback, _outErrorFile);
 }
 
-void VulkanGraphic::verifySwapChain(VkResult res)
+void VulkanGraphic::recreateSwapChainIfNotValid(VkResult res)
 {
 	switch (res)
 	{
@@ -393,8 +407,13 @@ bool VulkanGraphic::createPipeline()
 
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertexInputInfo.vertexBindingDescriptionCount = 0;
-	vertexInputInfo.vertexAttributeDescriptionCount = 0;
+	auto bindingDescription = Vertex::getBindingDescription();
+	auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
+	vertexInputInfo.vertexBindingDescriptionCount = 1;
+	vertexInputInfo.vertexAttributeDescriptionCount = static_cast< uint32_t >( attributeDescriptions.size() );
+	vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
 	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -566,7 +585,11 @@ bool VulkanGraphic::createCommandBuffers()
 			vkCmdSetViewport(_commandBuffers[i], 0, 1, &viewport);
 			vkCmdSetScissor(_commandBuffers[i], 0, 1, &scissor);
 
-			vkCmdDraw(_commandBuffers[i], 3, 1, 0, 0);
+			VkBuffer vertexBuffers[] = { _vertexBuffer };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(_commandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+			vkCmdDraw(_commandBuffers[i], _verticesCount, 1, 0, 0);
 
 		vkCmdEndRenderPass(_commandBuffers[i]);
 
@@ -584,13 +607,47 @@ bool VulkanGraphic::createSemaphores()
 	return true;
 }
 
+bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
+{
+	VkBufferCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	createInfo.size = sizeof((vertices[0])) * vertices.size();
+	createInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	VK_CALL(vkCreateBuffer(_device, &createInfo, nullptr, &_vertexBuffer));
+
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(_device, _vertexBuffer, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = findMemoryType( _physDevice, memRequirements.memoryTypeBits,
+									VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	VK_CALL( vkAllocateMemory(_device, &allocInfo, nullptr, &_vertexBufferMemory) );
+
+	// then we can now associate this memory with the buffer using
+	vkBindBufferMemory(_device, _vertexBuffer, _vertexBufferMemory, 0);
+
+	void* data;
+	vkMapMemory(_device, _vertexBufferMemory, 0, createInfo.size, 0, &data);
+	memcpy(data, vertices.data(), (size_t)createInfo.size);
+	vkUnmapMemory(_device, _vertexBufferMemory);
+
+	_verticesCount = static_cast< uint32_t >( vertices.size() );
+
+	return true;
+}
+
 void VulkanGraphic::render()
 {
 	// Acquire the next image from the swap chain
 	uint32_t imageIndex;
 	VkResult res = vkAcquireNextImageKHR(_device, _swapChain->_handle, std::numeric_limits<uint64_t>::max(), 
 					                     _imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
-	verifySwapChain(res);
+	recreateSwapChainIfNotValid(res);
 
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -621,8 +678,8 @@ void VulkanGraphic::render()
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = nullptr;
 
-	VkResult res = vkQueuePresentKHR(_presentationQueue.handle, &presentInfo);
-	verifySwapChain(res);
+	res = vkQueuePresentKHR(_presentationQueue.handle, &presentInfo);
+	recreateSwapChainIfNotValid(res);
 }
 
 VulkanGraphic::~VulkanGraphic()

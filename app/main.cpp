@@ -115,6 +115,14 @@ void updateCoreDll()
 	}
 }
 
+#include "vertex.h"
+const std::vector<Vertex> vertices =
+{
+	{ { 0.0f, -0.5f },{ 1.0f, 0.0f, 0.0f } },
+	{ { 0.5f, 0.5f },{ 0.0f, 1.0f, 0.0f } },
+	{ { -0.5f, 0.5f },{ 0.0f, 0.0f, 0.0f } }
+};
+
 static void initVulkan(VulkanGraphic& VK, GLFWwindow* window)
 {
 	VERIFY(VK.createSurface(window), "Cannot create vulkan surface.");
@@ -125,8 +133,9 @@ static void initVulkan(VulkanGraphic& VK, GLFWwindow* window)
 	VERIFY(VK.createPipeline(), "Cannot create the pipeline.");
 	VERIFY(VK.createFrameBuffers(), "Cannot create frame buffer.");
 	VERIFY(VK.createCommandPool(), "Cannot create frame buffer.");
+	VERIFY(VK.createVertexBuffer(vertices), "Cannot create vertex buffer.");
 	VERIFY(VK.createCommandBuffers(), "Cannot create frame buffer.");
-	VERIFY(VK.createSemaphores(), "Cannot create semaphores");
+	VERIFY(VK.createSemaphores(), "Cannot create semaphores.");
 }
 
 int main()

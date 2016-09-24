@@ -2,6 +2,7 @@
 #define VULKAN_GRAPHIC_H_
 
 #include <vulkan\vulkan.h>
+#include "vertex.h"
 #include "vkUtils.h"
 #include "swapChain.h"
 #include <memory>
@@ -29,6 +30,7 @@ public:
 	bool createCommandPool();
 	bool createCommandBuffers();
 	bool createSemaphores();
+	bool createVertexBuffer(const std::vector<Vertex>& vertices);
 
 	void render();
 	void recreateSwapChain();
@@ -40,7 +42,7 @@ private:
 	};
 
 	bool createShaderModule(const std::string& shaderPath, VDeleter<VkShaderModule>& shaderModule);
-	void verifySwapChain(VkResult res);
+	void recreateSwapChainIfNotValid(VkResult res);
 
 	VDeleter<VkInstance> _instance{ vkDestroyInstance };
 	VDeleter<VkDevice> _device{ vkDestroyDevice };
@@ -58,6 +60,10 @@ private:
 
 	VDeleter<VkSemaphore> _imageAvailableSemaphore{ _device, vkDestroySemaphore };
 	VDeleter<VkSemaphore> _renderFinishedSemaphore{ _device, vkDestroySemaphore };
+
+	VDeleter<VkBuffer> _vertexBuffer{ _device, vkDestroyBuffer };
+	VDeleter<VkDeviceMemory> _vertexBufferMemory{ _device, vkFreeMemory };
+	uint32_t _verticesCount;
 
 	VDeleter<VkDebugReportCallbackEXT> _validationCallback{ _instance, DestroyDebugReportCallbackEXT };
 	std::ofstream _outErrorFile;
