@@ -6,35 +6,37 @@
 
 class SwapChain
 {
-public:
-	SwapChain( const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& logicalDevice,
-			   const VDeleter<VkSurfaceKHR>& surface, VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-			   VkSwapchainKHR oldSwapChain = VK_NULL_HANDLE );
+  public:
+   SwapChain( const VkPhysicalDevice& physDevice,
+              const VDeleter<VkDevice>& logicalDevice,
+              const VDeleter<VkSurfaceKHR>& surface,
+              VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+              VkSwapchainKHR oldSwapChain = VK_NULL_HANDLE );
 
-	inline VkFormat getCurrentFormat() const
-	{
-		return _surfaceFormats[_selectedSurfaceFormat].format;
-	}
+   inline VkFormat getCurrentFormat() const
+   {
+      return _surfaceFormats[ _selectedSurfaceFormat ].format;
+   }
 
-	inline VkColorSpaceKHR getCurrentColorSpace() const
-	{
-		return _surfaceFormats[_selectedSurfaceFormat].colorSpace;
-	}
+   inline VkColorSpaceKHR getCurrentColorSpace() const
+   {
+      return _surfaceFormats[ _selectedSurfaceFormat ].colorSpace;
+   }
 
-	VDeleter< VkSwapchainKHR > _handle;
-	VkExtent2D _curExtent;
-	VkExtent2D _minExtent;
-	VkExtent2D _maxExtent;
+   VDeleter<VkSwapchainKHR> _handle;
+   VkExtent2D _curExtent;
+   VkExtent2D _minExtent;
+   VkExtent2D _maxExtent;
 
-	std::vector< VkSurfaceFormatKHR > _surfaceFormats;
-	size_t _selectedSurfaceFormat = 0;
+   std::vector<VkSurfaceFormatKHR> _surfaceFormats;
+   size_t _selectedSurfaceFormat = 0;
 
-	std::vector< VkPresentModeKHR > _presentModes;
-	size_t _selectedPresentMode = 0;
+   std::vector<VkPresentModeKHR> _presentModes;
+   size_t _selectedPresentMode = 0;
 
-	uint32_t _imageCount;
-	std::vector<VkImage> _images;
-	std::vector<VDeleter<VkImageView>> _imageViews;
+   uint32_t _imageCount;
+   std::vector<VkImage> _images;
+   std::vector<VDeleter<VkImageView>> _imageViews;
 };
 
-#endif // SWAP_CHAIN_H_
+#endif  // SWAP_CHAIN_H_
