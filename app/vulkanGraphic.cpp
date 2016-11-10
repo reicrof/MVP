@@ -674,8 +674,9 @@ bool VulkanGraphic::createCommandBuffers()
       VkBuffer vertexBuffers[] = {_vertexBuffer};
       VkDeviceSize offsets[] = {0};
       vkCmdBindVertexBuffers( _commandBuffers[ i ], 0, 1, vertexBuffers, offsets );
+      vkCmdBindIndexBuffer( _commandBuffers[ i ], _indexBuffer, 0, VK_INDEX_TYPE_UINT32 );
 
-      vkCmdDraw( _commandBuffers[ i ], _verticesCount, 1, 0, 0 );
+      vkCmdDrawIndexed( _commandBuffers[ i ], _indexCount, 1, 0, 0, 0 );
 
       vkCmdEndRenderPass( _commandBuffers[ i ] );
 
@@ -743,6 +744,30 @@ bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
                _graphicQueue.handle );
 
    _verticesCount = static_cast<uint32_t>( vertices.size() );
+
+   return true;
+}
+
+bool VulkanGraphic::createIndexBuffer( const std::vector<uint32_t>& indices )
+{
+   const size_t bufferSize = indices.size() * sizeof( uint32_t );
+   VDeleter<VkBuffer> stagingBuffer{_device, vkDestroyBuffer};
+   VDeleter<VkDeviceMemory> stagingBufferMemory{_device, vkFreeMemory};
+   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory );
+   void* data;
+   vkMapMemory( _device, stagingBufferMemory, 0, bufferSize, 0, &data );
+   memcpy( data, indices.data(), bufferSize );
+   vkUnmapMemory( _device, stagingBufferMemory );
+
+   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _indexBuffer, _indexBufferMemory );
+
+   copyBuffer( stagingBuffer, _indexBuffer, bufferSize, _device, _commandPool,
+               _graphicQueue.handle );
+
+   _indexCount = indices.size();
 
    return true;
 }

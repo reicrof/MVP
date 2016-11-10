@@ -33,6 +33,7 @@ class VulkanGraphic
    bool createCommandBuffers();
    bool createSemaphores();
    bool createVertexBuffer( const std::vector<Vertex>& vertices );
+   bool createIndexBuffer( const std::vector<uint32_t>& indices );
 
    void render();
    void recreateSwapChain();
@@ -71,7 +72,10 @@ class VulkanGraphic
 
    VDeleter<VkBuffer> _vertexBuffer{_device, vkDestroyBuffer};
    VDeleter<VkDeviceMemory> _vertexBufferMemory{_device, vkFreeMemory};
+   VDeleter<VkBuffer> _indexBuffer{_device, vkDestroyBuffer};
+   VDeleter<VkDeviceMemory> _indexBufferMemory{_device, vkFreeMemory};
    uint32_t _verticesCount;
+   uint32_t _indexCount;
 
    VDeleter<VkDebugReportCallbackEXT> _validationCallback{_instance, DestroyDebugReportCallbackEXT};
    std::ofstream _outErrorFile;

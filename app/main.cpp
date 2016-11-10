@@ -122,9 +122,11 @@ void updateCoreDll()
 }
 
 #include "vertex.h"
-const std::vector<Vertex> vertices = {{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-                                      {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-                                      {{-0.5f, 0.5f}, {0.0f, 0.0f, 0.0f}}};
+const std::vector<Vertex> vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+                                      {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+                                      {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+                                      {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}};
+const std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
 
 static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
 {
@@ -137,6 +139,7 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createFrameBuffers(), "Cannot create frame buffer." );
    VERIFY( VK.createCommandPool(), "Cannot create frame buffer." );
    VERIFY( VK.createVertexBuffer( vertices ), "Cannot create vertex buffer." );
+   VERIFY( VK.createIndexBuffer( indices ), "Cannot create index buffer." );
    VERIFY( VK.createCommandBuffers(), "Cannot create frame buffer." );
    VERIFY( VK.createSemaphores(), "Cannot create semaphores." );
 }
