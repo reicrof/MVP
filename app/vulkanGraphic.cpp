@@ -154,6 +154,46 @@ uint32_t findMemoryType( const VkPhysicalDevice& physDevice,
    }
    return -1;
 }
+
+void copyBuffer( VkBuffer source,
+                 VkBuffer dest,
+                 VkDeviceSize size,
+                 VDeleter<VkDevice>& device,
+                 VDeleter<VkCommandPool>& commandPool,
+                 VkQueue& queue )
+{
+   // Should probably use a pool for creating the command buffers
+   VkCommandBufferAllocateInfo info = {};
+   info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+   info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+   info.commandPool = commandPool;
+   info.commandBufferCount = 1;
+
+   VkCommandBuffer commandBuffer;
+   vkAllocateCommandBuffers( device, &info, &commandBuffer );
+
+   VkCommandBufferBeginInfo beginInfo = {};
+   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+   vkBeginCommandBuffer( commandBuffer, &beginInfo );
+
+   VkBufferCopy copyRegion = {};
+   copyRegion.size = size;
+   vkCmdCopyBuffer( commandBuffer, source, dest, 1, &copyRegion );
+
+   vkEndCommandBuffer( commandBuffer );
+
+   VkSubmitInfo submitInfo = {};
+   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+   submitInfo.commandBufferCount = 1;
+   submitInfo.pCommandBuffers = &commandBuffer;
+
+   vkQueueSubmit( queue, 1, &submitInfo, VK_NULL_HANDLE );
+   vkQueueWaitIdle( queue );
+   vkFreeCommandBuffers( device, commandPool, 1, &commandBuffer );
+}
+
 }  // End of anonymous namespace
 
 void VulkanGraphic::recreateSwapChain()
@@ -653,35 +693,54 @@ bool VulkanGraphic::createSemaphores()
    return true;
 }
 
-bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
+void VulkanGraphic::createBuffer( VkDeviceSize size,
+                                  VkBufferUsageFlags usage,
+                                  VkMemoryPropertyFlags properties,
+                                  VDeleter<VkBuffer>& buffer,
+                                  VDeleter<VkDeviceMemory>& bufferMemory )
 {
-   VkBufferCreateInfo createInfo = {};
-   createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-   createInfo.size = sizeof( ( vertices[ 0 ] ) ) * vertices.size();
-   createInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-   createInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+   VkBufferCreateInfo bufferInfo = {};
+   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+   bufferInfo.size = size;
+   bufferInfo.usage = usage;
+   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-   VK_CALL( vkCreateBuffer( _device, &createInfo, nullptr, &_vertexBuffer ) );
+   VK_CALL( vkCreateBuffer( _device, &bufferInfo, nullptr, &buffer ) );
 
    VkMemoryRequirements memRequirements;
-   vkGetBufferMemoryRequirements( _device, _vertexBuffer, &memRequirements );
+   vkGetBufferMemoryRequirements( _device, buffer, &memRequirements );
 
    VkMemoryAllocateInfo allocInfo = {};
    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
    allocInfo.allocationSize = memRequirements.size;
    allocInfo.memoryTypeIndex =
-      findMemoryType( _physDevice, memRequirements.memoryTypeBits,
-                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT );
+      findMemoryType( _physDevice, memRequirements.memoryTypeBits, properties );
 
-   VK_CALL( vkAllocateMemory( _device, &allocInfo, nullptr, &_vertexBufferMemory ) );
+   VK_CALL( vkAllocateMemory( _device, &allocInfo, nullptr, &bufferMemory ) );
 
-   // then we can now associate this memory with the buffer using
-   vkBindBufferMemory( _device, _vertexBuffer, _vertexBufferMemory, 0 );
+   vkBindBufferMemory( _device, buffer, bufferMemory, 0 );
+}
 
+
+bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
+{
+   const size_t bufferSize = sizeof( ( vertices[ 0 ] ) ) * vertices.size();
+
+   VDeleter<VkBuffer> stagingBuffer{_device, vkDestroyBuffer};
+   VDeleter<VkDeviceMemory> stagingBufferMemory{_device, vkFreeMemory};
+   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory );
    void* data;
-   vkMapMemory( _device, _vertexBufferMemory, 0, createInfo.size, 0, &data );
-   memcpy( data, vertices.data(), (size_t)createInfo.size );
-   vkUnmapMemory( _device, _vertexBufferMemory );
+   vkMapMemory( _device, stagingBufferMemory, 0, bufferSize, 0, &data );
+   memcpy( data, vertices.data(), bufferSize );
+   vkUnmapMemory( _device, stagingBufferMemory );
+
+   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _vertexBuffer, _vertexBufferMemory );
+
+   copyBuffer( stagingBuffer, _vertexBuffer, bufferSize, _device, _commandPool,
+               _graphicQueue.handle );
 
    _verticesCount = static_cast<uint32_t>( vertices.size() );
 

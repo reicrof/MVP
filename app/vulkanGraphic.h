@@ -44,6 +44,11 @@ class VulkanGraphic
       VkQueue handle;
    };
 
+   void createBuffer( VkDeviceSize size,
+                      VkBufferUsageFlags usage,
+                      VkMemoryPropertyFlags properties,
+                      VDeleter<VkBuffer>& buffer,
+                      VDeleter<VkDeviceMemory>& bufferMemory );
    bool createShaderModule( const std::string& shaderPath, VDeleter<VkShaderModule>& shaderModule );
    void recreateSwapChainIfNotValid( VkResult res );
 
