@@ -1,4 +1,5 @@
 #include "vulkanGraphic.h"
+#include "swapChain.h"
 #include "utils.h"
 #include <algorithm>
 #include <assert.h>
@@ -6,6 +7,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <cstring>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -67,7 +69,7 @@ namespace
 {
 void setupDebugCallback( const VDeleter<VkInstance>& instance,
                          VDeleter<VkDebugReportCallbackEXT>& callback,
-                         std::ofstream& outErrorFile )
+                         std::unique_ptr< std::ofstream >& outErrorFile )
 {
    if ( !enableValidationLayers )
       return;
@@ -79,7 +81,7 @@ void setupDebugCallback( const VDeleter<VkInstance>& instance,
    createInfo.pUserData = &outErrorFile;
 
    VK_CALL( CreateDebugReportCallbackEXT( instance, &createInfo, nullptr, &callback ) );
-   outErrorFile = std::ofstream( "VulkanErrors.txt" );
+   outErrorFile = std::unique_ptr< std::ofstream >( new std::ofstream( "VulkanErrors.txt" ) );
 }
 
 bool checkValidationLayerSupport()
@@ -96,7 +98,7 @@ bool checkValidationLayerSupport()
 
       for ( const auto& layerProperties : availableLayers )
       {
-         if ( strcmp( layerName, layerProperties.layerName ) == 0 )
+         if ( std::strcmp( layerName, layerProperties.layerName ) == 0 )
          {
             layerFound = true;
             break;

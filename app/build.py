@@ -3,8 +3,8 @@ import sys
 import platform
 
 if platform.system() == "Linux":
-   compiler = "clang++"
-   compilerFlags = ["-std=c++11", "-stdlib=libstdc++", "-Werror"]
+   compiler = "/DLlocal/landrych/cfe-3.9.0.src/build/bin/clang++"
+   compilerFlags = ["-std=c++1z", "-stdlib=libc++", "-Werror"]
    srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp" ]
    coreInclude = ["../core/"]
    glfwInclude = [ "../thirdParties/glfw/include/" ]

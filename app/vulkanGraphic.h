@@ -10,7 +10,6 @@
 #include <vulkan/vulkan.h>
 
 struct GLFWwindow;
-class SwapChain;
 
 void DestroyDebugReportCallbackEXT( VkInstance instance,
                                     VkDebugReportCallbackEXT callback,
@@ -78,7 +77,7 @@ class VulkanGraphic
    uint32_t _indexCount;
 
    VDeleter<VkDebugReportCallbackEXT> _validationCallback{_instance, DestroyDebugReportCallbackEXT};
-   std::ofstream _outErrorFile;
+   std::unique_ptr< std::ofstream > _outErrorFile;
 };
 
 #endif  // VULKAN_GRAPHIC_H_

@@ -14,9 +14,15 @@
 #include <iostream>
 #include <string>
 
-#define RTLD_LAZY 1
-#define RTLD_NOW 2
-#define RTLD_GLOBAL 4
+#ifndef RTLD_LAZY
+   #define RTLD_LAZY 1
+#endif
+#ifndef RTLD_NOW
+   #define RTLD_NOW 2
+#endif
+#ifndef RTLD_GLOBAL
+   #define RTLD_GLOBAL 4
+#endif
 
 void* loadSharedLibrary( const char* libNameNoExt, int iMode = 2 )
 {
@@ -35,7 +41,7 @@ void* getFunction( void* lib, const char* funcName )
 #if defined( WIN32 ) || defined( _WIN32 )
    return (void*)GetProcAddress( (HINSTANCE)lib, funcName );
 #else
-   return dlsym( Lib, Fnname );
+   return dlsym( lib, funcName );
 #endif
 }
 
@@ -44,7 +50,7 @@ bool freeSharedLibrary( void* handle )
 #if defined( WIN32 ) || defined( _WIN32 )
    return FreeLibrary( (HINSTANCE)handle ) == TRUE;
 #else
-   return dlclose( hDLL );
+   return dlclose( handle );
 #endif
 }
 
@@ -72,6 +78,7 @@ getFileTimeFromFile( const char* fileName )
 
 static void loadCoreFunctions()
 {
+#if defined( WIN32 ) || defined( _WIN32 )
    if ( coreDll )
    {
       freeSharedLibrary( coreDll );
@@ -85,6 +92,7 @@ static void loadCoreFunctions()
 
    ptr = (getOneFnPtr)getFunction( coreDll, "getOne" );
    VERIFY( ptr, "cannot get function" );
+#endif
 }
 
 bool shouldReloadCoreLib()
@@ -93,6 +101,7 @@ bool shouldReloadCoreLib()
    const auto fileTime = getFileTimeFromFile( coreDllName );
    return CompareFileTime( &fileTime, &lastLoadedCoreDllWriteTime ) == 1;
 #else
+   return false;
 #endif
 }
 
