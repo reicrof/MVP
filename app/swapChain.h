@@ -2,7 +2,7 @@
 #define SWAP_CHAIN_H_
 #include "vkUtils.h"
 #include <vector>
-#include <vulkan\vulkan.h>
+#include <vulkan/vulkan.h>
 
 class SwapChain
 {

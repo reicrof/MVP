@@ -1,7 +1,7 @@
 #ifndef VERTEX_H_
 #define VERTEX_H_
 
-#include <vulkan\vulkan.h>
+#include <vulkan/vulkan.h>
 #include "../thirdParties/glm/glm.hpp"
 
 #include <array>

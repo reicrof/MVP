@@ -7,7 +7,7 @@
 #include <fstream>
 #include <memory>
 #include <vector>
-#include <vulkan\vulkan.h>
+#include <vulkan/vulkan.h>
 
 struct GLFWwindow;
 class SwapChain;

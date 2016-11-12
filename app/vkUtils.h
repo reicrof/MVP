@@ -1,6 +1,6 @@
 #ifndef VK_UTILS_H_
 #define VK_UTILS_H_
-#include <vulkan\vulkan.h>
+#include <vulkan/vulkan.h>
 #include <functional>
 #include <assert.h>
 #include <iostream>
