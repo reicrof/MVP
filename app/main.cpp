@@ -10,18 +10,21 @@
 #include "utils.h"
 #include "vulkanGraphic.h"
 
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <assert.h>
 #include <iostream>
 #include <string>
+#include <chrono>
 
 #ifndef RTLD_LAZY
-   #define RTLD_LAZY 1
+#define RTLD_LAZY 1
 #endif
 #ifndef RTLD_NOW
-   #define RTLD_NOW 2
+#define RTLD_NOW 2
 #endif
 #ifndef RTLD_GLOBAL
-   #define RTLD_GLOBAL 4
+#define RTLD_GLOBAL 4
 #endif
 
 void* loadSharedLibrary( const char* libNameNoExt, int iMode = 2 )
@@ -144,13 +147,35 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createLogicalDevice(), "Cannot create logical device." );
    VERIFY( VK.createSwapChain(), "Cannot create swap chain." );
    VERIFY( VK.createRenderPass(), "Cannot create a render pass." );
+   VERIFY( VK.createDescriptorSetLayout(), "Cannot create descriptor set layout" );
    VERIFY( VK.createPipeline(), "Cannot create the pipeline." );
    VERIFY( VK.createFrameBuffers(), "Cannot create frame buffer." );
-   VERIFY( VK.createCommandPool(), "Cannot create frame buffer." );
+   VERIFY( VK.createUniformBuffer(), "Cannot create uniform buffer." );
+   VERIFY( VK.createDescriptorPool(), "Cannot create descriptor pool." );
+   VERIFY( VK.createDescriptorSet(), "Cannot create descriptor set." );
+   VERIFY( VK.createCommandPool(), "Cannot create command pool." );
    VERIFY( VK.createVertexBuffer( vertices ), "Cannot create vertex buffer." );
    VERIFY( VK.createIndexBuffer( indices ), "Cannot create index buffer." );
    VERIFY( VK.createCommandBuffers(), "Cannot create frame buffer." );
    VERIFY( VK.createSemaphores(), "Cannot create semaphores." );
+}
+
+void updateUBO( UniformBufferObject& ubo, const SwapChain* swapChain )
+{
+   static auto startTime = std::chrono::high_resolution_clock::now();
+
+   auto currentTime = std::chrono::high_resolution_clock::now();
+   float time =
+      std::chrono::duration_cast<std::chrono::milliseconds>( currentTime - startTime ).count() /
+      1000.0f;
+
+   ubo.model =
+      glm::rotate( glm::mat4(), time * glm::radians( 90.0f ), glm::vec3( 0.0f, 0.0f, 1.0f ) );
+   ubo.view = glm::lookAt( glm::vec3( 2.0f, 2.0f, 2.0f ), glm::vec3( 0.0f, 0.0f, 0.0f ),
+                           glm::vec3( 0.0f, 0.0f, 1.0f ) );
+   ubo.proj = glm::perspective( glm::radians( 45.0f ),
+                                swapChain->_curExtent.width / (float)swapChain->_curExtent.height,
+                                0.1f, 10.0f );
 }
 
 int main()
@@ -179,10 +204,14 @@ int main()
    glfwSetWindowUserPointer( window, &VK );  // Set user data
    glfwSetWindowSizeCallback( window, onWindowResized );
 
+   UniformBufferObject ubo = {};
+
    while ( !glfwWindowShouldClose( window ) )
    {
       updateCoreDll();
       glfwPollEvents();
+      updateUBO( ubo, VK.getSwapChain() );
+      VK.updateUBO( ubo );
       // std::cout << ptr() << std::endl;
       VK.render();
    }

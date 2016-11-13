@@ -2,7 +2,7 @@
 
 del /Q *.pdb
 
-set clangFlags=-std=c++1z -Werror
+set clangFlags=-std=c++1z -Werror -g
 
 set srcFiles=main.cpp vulkanGraphic.cpp swapchain.cpp
 set coreInclude=../core/

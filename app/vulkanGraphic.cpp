@@ -69,19 +69,19 @@ namespace
 {
 void setupDebugCallback( const VDeleter<VkInstance>& instance,
                          VDeleter<VkDebugReportCallbackEXT>& callback,
-                         std::unique_ptr< std::ofstream >& outErrorFile )
+                         std::unique_ptr<std::ofstream>& outErrorFile )
 {
    if ( !enableValidationLayers )
       return;
 
+   outErrorFile = std::unique_ptr<std::ofstream>(new std::ofstream("VulkanErrors.txt", std::ios::out));
    VkDebugReportCallbackCreateInfoEXT createInfo = {};
    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
    createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
    createInfo.pfnCallback = debugCallback;
-   createInfo.pUserData = &outErrorFile;
+   createInfo.pUserData = outErrorFile.get();
 
    VK_CALL( CreateDebugReportCallbackEXT( instance, &createInfo, nullptr, &callback ) );
-   outErrorFile = std::unique_ptr< std::ofstream >( new std::ofstream( "VulkanErrors.txt" ) );
 }
 
 bool checkValidationLayerSupport()
@@ -466,6 +466,25 @@ bool VulkanGraphic::createShaderModule( const std::string& shaderPath,
    return true;
 }
 
+bool VulkanGraphic::createDescriptorSetLayout()
+{
+   VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+   uboLayoutBinding.binding = 0;
+   uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+   uboLayoutBinding.descriptorCount = 1;
+   uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+   uboLayoutBinding.pImmutableSamplers = nullptr;
+
+   VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+   layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+   layoutInfo.bindingCount = 1;
+   layoutInfo.pBindings = &uboLayoutBinding;
+
+   VK_CALL( vkCreateDescriptorSetLayout( _device, &layoutInfo, nullptr, &_descriptorSetLayout ) );
+
+   return true;
+}
+
 bool VulkanGraphic::createPipeline()
 {
    VDeleter<VkShaderModule> vertShaderModule{_device, vkDestroyShaderModule};
@@ -551,10 +570,11 @@ bool VulkanGraphic::createPipeline()
    colorBlending.blendConstants[ 2 ] = 0.0f;
    colorBlending.blendConstants[ 3 ] = 0.0f;
 
+   VkDescriptorSetLayout setLayout[] = {_descriptorSetLayout};
    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-   pipelineLayoutInfo.setLayoutCount = 0;
-   pipelineLayoutInfo.pushConstantRangeCount = 0;
+   pipelineLayoutInfo.setLayoutCount = 1;
+   pipelineLayoutInfo.pSetLayouts = setLayout;
 
    VK_CALL( vkCreatePipelineLayout( _device, &pipelineLayoutInfo, nullptr, &_pipelineLayout ) );
 
@@ -619,6 +639,55 @@ bool VulkanGraphic::createCommandPool()
    return true;
 }
 
+bool VulkanGraphic::createDescriptorPool()
+{
+   VkDescriptorPoolSize poolSize = {};
+   poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+   poolSize.descriptorCount = 1;
+
+   VkDescriptorPoolCreateInfo poolInfo = {};
+   poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+   poolInfo.poolSizeCount = 1;
+   poolInfo.pPoolSizes = &poolSize;
+   poolInfo.maxSets = 1;
+
+   VK_CALL( vkCreateDescriptorPool( _device, &poolInfo, nullptr, &_descriptorPool ) );
+
+   return true;
+}
+
+bool VulkanGraphic::createDescriptorSet()
+{
+   VkDescriptorSetLayout layouts[] = {_descriptorSetLayout};
+   VkDescriptorSetAllocateInfo allocInfo = {};
+   allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+   allocInfo.descriptorPool = _descriptorPool;
+   allocInfo.descriptorSetCount = 1;
+   allocInfo.pSetLayouts = layouts;
+
+   VK_CALL( vkAllocateDescriptorSets( _device, &allocInfo, &_descriptorSet ) );
+
+   VkDescriptorBufferInfo bufferInfo = {};
+   bufferInfo.buffer = _uniformBuffer;
+   bufferInfo.offset = 0;
+   bufferInfo.range = sizeof( UniformBufferObject );
+
+   VkWriteDescriptorSet descriptorWrite = {};
+   descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+   descriptorWrite.dstSet = _descriptorSet;
+   descriptorWrite.dstBinding = 0;
+   descriptorWrite.dstArrayElement = 0;
+   descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+   descriptorWrite.descriptorCount = 1;
+   descriptorWrite.pBufferInfo = &bufferInfo;
+   descriptorWrite.pImageInfo = nullptr;
+   descriptorWrite.pTexelBufferView = nullptr;
+
+   vkUpdateDescriptorSets( _device, 1, &descriptorWrite, 0, nullptr );
+
+   return true;
+}
+
 bool VulkanGraphic::createCommandBuffers()
 {
    if ( _commandBuffers.size() > 0 )
@@ -672,6 +741,9 @@ bool VulkanGraphic::createCommandBuffers()
 
       vkCmdSetViewport( _commandBuffers[ i ], 0, 1, &viewport );
       vkCmdSetScissor( _commandBuffers[ i ], 0, 1, &scissor );
+
+      vkCmdBindDescriptorSets( _commandBuffers[ i ], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                               _pipelineLayout, 0, 1, &_descriptorSet, 0, nullptr );
 
       VkBuffer vertexBuffers[] = {_vertexBuffer};
       VkDeviceSize offsets[] = {0};
@@ -769,9 +841,33 @@ bool VulkanGraphic::createIndexBuffer( const std::vector<uint32_t>& indices )
    copyBuffer( stagingBuffer, _indexBuffer, bufferSize, _device, _commandPool,
                _graphicQueue.handle );
 
-   _indexCount = indices.size();
+   _indexCount = static_cast<uint32_t>( indices.size() );
 
    return true;
+}
+
+bool VulkanGraphic::createUniformBuffer()
+{
+   VkDeviceSize bufferSize = sizeof( UniformBufferObject );
+
+   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 _uniformStagingBuffer, _uniformStagingBufferMemory );
+   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _uniformBuffer, _uniformBufferMemory );
+
+   return true;
+}
+
+void VulkanGraphic::updateUBO( const UniformBufferObject& ubo )
+{
+   void* data;
+   vkMapMemory( _device, _uniformStagingBufferMemory, 0, sizeof( ubo ), 0, &data );
+   memcpy( data, &ubo, sizeof( ubo ) );
+   vkUnmapMemory( _device, _uniformStagingBufferMemory );
+
+   copyBuffer( _uniformStagingBuffer, _uniformBuffer, sizeof( ubo ), _device, _commandPool,
+               _graphicQueue.handle );
 }
 
 void VulkanGraphic::render()
@@ -814,6 +910,11 @@ void VulkanGraphic::render()
 
    res = vkQueuePresentKHR( _presentationQueue.handle, &presentInfo );
    recreateSwapChainIfNotValid( res );
+}
+
+const SwapChain* VulkanGraphic::getSwapChain() const
+{
+   return _swapChain.get();
 }
 
 VulkanGraphic::~VulkanGraphic()
