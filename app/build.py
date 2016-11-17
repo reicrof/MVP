@@ -4,11 +4,14 @@ import platform
 
 outName = "mvp"
 srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp" ]
+coreInclude = ["../core/"]
+
+# Third parties includes
 glfwInclude = [ "../thirdParties/glfw/include/" ]
 glmInclude = [ "../thirdParties/" ]
 vulkanLibPath = ["../thirdParties/vulkan/"]
 vulkanIncludePath = ["../thirdParties/vulkan/include"]
-coreInclude = ["../core/"]
+stbIncludePath = ["../thirdParties/stb"]
 
 if platform.system() == "Linux":
    compiler = "/DLlocal/landrych/cfe-3.9.0.src/build/bin/clang++"
@@ -23,4 +26,4 @@ elif platform.system() == "Windows":
    outName += ".exe"
 
 subprocess.call( [ compiler ] + compilerFlags + srcFiles + ["-I"] + glfwInclude + ["-I"] + vulkanIncludePath + \
-                  ["-I"] + glmInclude + ["-I"] + coreInclude + ["-L"] + glfwLibPath + ["-L"] + vulkanLibPath + libs + ["-o"] + [ outName ] )
+                  ["-I"] + glmInclude + ["-I"] + stbIncludePath + ["-I"] + coreInclude + ["-L"] + glfwLibPath + ["-L"] + vulkanLibPath + libs + ["-o"] + [ outName ] )

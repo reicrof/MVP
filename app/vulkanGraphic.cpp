@@ -12,6 +12,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 const std::vector<const char*> VALIDATION_LAYERS = {"VK_LAYER_LUNARG_standard_validation"};
 
 const std::vector<const char*> DEVICE_EXTENSIONS = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
@@ -74,7 +77,8 @@ void setupDebugCallback( const VDeleter<VkInstance>& instance,
    if ( !enableValidationLayers )
       return;
 
-   outErrorFile = std::unique_ptr<std::ofstream>(new std::ofstream("VulkanErrors.txt", std::ios::out));
+   outErrorFile =
+      std::unique_ptr<std::ofstream>( new std::ofstream( "VulkanErrors.txt", std::ios::out ) );
    VkDebugReportCallbackCreateInfoEXT createInfo = {};
    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
    createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
@@ -157,22 +161,17 @@ uint32_t findMemoryType( const VkPhysicalDevice& physDevice,
    return -1;
 }
 
-void copyBuffer( VkBuffer source,
-                 VkBuffer dest,
-                 VkDeviceSize size,
-                 VDeleter<VkDevice>& device,
-                 VDeleter<VkCommandPool>& commandPool,
-                 VkQueue& queue )
+VkCommandBuffer beginSingleTimeCommands( VDeleter<VkDevice>& device,
+                                         VDeleter<VkCommandPool>& commandPool )
 {
-   // Should probably use a pool for creating the command buffers
-   VkCommandBufferAllocateInfo info = {};
-   info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-   info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-   info.commandPool = commandPool;
-   info.commandBufferCount = 1;
+   VkCommandBufferAllocateInfo allocInfo = {};
+   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+   allocInfo.commandPool = commandPool;
+   allocInfo.commandBufferCount = 1;
 
    VkCommandBuffer commandBuffer;
-   vkAllocateCommandBuffers( device, &info, &commandBuffer );
+   vkAllocateCommandBuffers( device, &allocInfo, &commandBuffer );
 
    VkCommandBufferBeginInfo beginInfo = {};
    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -180,10 +179,14 @@ void copyBuffer( VkBuffer source,
 
    vkBeginCommandBuffer( commandBuffer, &beginInfo );
 
-   VkBufferCopy copyRegion = {};
-   copyRegion.size = size;
-   vkCmdCopyBuffer( commandBuffer, source, dest, 1, &copyRegion );
+   return commandBuffer;
+}
 
+void endSingleTimeCommands( VkCommandBuffer commandBuffer,
+                            VDeleter<VkDevice>& device,
+                            VkQueue& queue,
+                            VDeleter<VkCommandPool>& commandPool )
+{
    vkEndCommandBuffer( commandBuffer );
 
    VkSubmitInfo submitInfo = {};
@@ -193,7 +196,108 @@ void copyBuffer( VkBuffer source,
 
    vkQueueSubmit( queue, 1, &submitInfo, VK_NULL_HANDLE );
    vkQueueWaitIdle( queue );
+
    vkFreeCommandBuffers( device, commandPool, 1, &commandBuffer );
+}
+
+void copyBuffer( VkBuffer source,
+                 VkBuffer dest,
+                 VkDeviceSize size,
+                 VDeleter<VkDevice>& device,
+                 VDeleter<VkCommandPool>& commandPool,
+                 VkQueue& queue )
+{
+   // Should probably use a pool for creating the command buffers
+   VkCommandBuffer commandBuffer = beginSingleTimeCommands( device, commandPool );
+
+   VkBufferCopy copyRegion = {};
+   copyRegion.size = size;
+   vkCmdCopyBuffer( commandBuffer, source, dest, 1, &copyRegion );
+
+   endSingleTimeCommands( commandBuffer, device, queue, commandPool );
+}
+
+void copyImage( VkImage srcImage,
+                VkImage dstImage,
+                uint32_t width,
+                uint32_t height,
+                VDeleter<VkDevice>& device,
+                VDeleter<VkCommandPool>& commandPool,
+                VkQueue& queue )
+{
+   VkCommandBuffer commandBuffer = beginSingleTimeCommands( device, commandPool );
+
+   VkImageSubresourceLayers subResource = {};
+   subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+   subResource.baseArrayLayer = 0;
+   subResource.mipLevel = 0;
+   subResource.layerCount = 1;
+
+   VkImageCopy region = {};
+   region.srcSubresource = subResource;
+   region.dstSubresource = subResource;
+   region.srcOffset = {0, 0, 0};
+   region.dstOffset = {0, 0, 0};
+   region.extent.width = width;
+   region.extent.height = height;
+   region.extent.depth = 1;
+
+   vkCmdCopyImage( commandBuffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImage,
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
+
+   endSingleTimeCommands( commandBuffer, device, queue, commandPool );
+}
+
+VkAccessFlags vkImageLayoutToAccessFlags( VkImageLayout layout )
+{
+   switch ( layout )
+   {
+      case VK_IMAGE_LAYOUT_PREINITIALIZED:
+         return VK_ACCESS_HOST_WRITE_BIT;
+      case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+         return VK_ACCESS_TRANSFER_READ_BIT;
+      case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+         return VK_ACCESS_TRANSFER_WRITE_BIT;
+      case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+         return VK_ACCESS_SHADER_READ_BIT;
+      default:
+         assert( !"Invalid img laout" );
+         return VkAccessFlags();
+   }
+}
+
+void transitionImageLayout( VkImage image,
+                            VkFormat format,
+                            VkImageLayout oldLayout,
+                            VkImageLayout newLayout,
+                            VDeleter<VkDevice>& device,
+                            VDeleter<VkCommandPool>& commandPool,
+                            VkQueue& queue )
+{
+   VkCommandBuffer commandBuffer = beginSingleTimeCommands( device, commandPool );
+
+   VkImageMemoryBarrier barrier = {};
+   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+   barrier.oldLayout = oldLayout;
+   barrier.newLayout = newLayout;
+   // Queue family ownership
+   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+   barrier.image = image;
+   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+   barrier.subresourceRange.baseMipLevel = 0;
+   barrier.subresourceRange.levelCount = 1;
+   barrier.subresourceRange.baseArrayLayer = 0;
+   barrier.subresourceRange.layerCount = 1;
+   barrier.srcAccessMask = vkImageLayoutToAccessFlags( oldLayout );
+   barrier.dstAccessMask = vkImageLayoutToAccessFlags( newLayout );
+
+   vkCmdPipelineBarrier( commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                         &barrier );
+
+   endSingleTimeCommands( commandBuffer, device, queue, commandPool );
 }
 
 }  // End of anonymous namespace
@@ -475,10 +579,18 @@ bool VulkanGraphic::createDescriptorSetLayout()
    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
    uboLayoutBinding.pImmutableSamplers = nullptr;
 
+   VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
+   samplerLayoutBinding.binding = 1;
+   samplerLayoutBinding.descriptorCount = 1;
+   samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+   samplerLayoutBinding.pImmutableSamplers = nullptr;
+   samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+   std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-   layoutInfo.bindingCount = 1;
-   layoutInfo.pBindings = &uboLayoutBinding;
+   layoutInfo.bindingCount = static_cast<uint32_t>( bindings.size() );
+   layoutInfo.pBindings = bindings.data();
 
    VK_CALL( vkCreateDescriptorSetLayout( _device, &layoutInfo, nullptr, &_descriptorSetLayout ) );
 
@@ -641,14 +753,16 @@ bool VulkanGraphic::createCommandPool()
 
 bool VulkanGraphic::createDescriptorPool()
 {
-   VkDescriptorPoolSize poolSize = {};
-   poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-   poolSize.descriptorCount = 1;
+   std::array<VkDescriptorPoolSize, 2> poolSizes = {};
+   poolSizes[ 0 ].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+   poolSizes[ 0 ].descriptorCount = 1;
+   poolSizes[ 1 ].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+   poolSizes[ 1 ].descriptorCount = 1;
 
    VkDescriptorPoolCreateInfo poolInfo = {};
    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-   poolInfo.poolSizeCount = 1;
-   poolInfo.pPoolSizes = &poolSize;
+   poolInfo.poolSizeCount = static_cast<uint32_t>( poolSizes.size() );
+   poolInfo.pPoolSizes = poolSizes.data();
    poolInfo.maxSets = 1;
 
    VK_CALL( vkCreateDescriptorPool( _device, &poolInfo, nullptr, &_descriptorPool ) );
@@ -672,18 +786,35 @@ bool VulkanGraphic::createDescriptorSet()
    bufferInfo.offset = 0;
    bufferInfo.range = sizeof( UniformBufferObject );
 
-   VkWriteDescriptorSet descriptorWrite = {};
-   descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-   descriptorWrite.dstSet = _descriptorSet;
-   descriptorWrite.dstBinding = 0;
-   descriptorWrite.dstArrayElement = 0;
-   descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-   descriptorWrite.descriptorCount = 1;
-   descriptorWrite.pBufferInfo = &bufferInfo;
-   descriptorWrite.pImageInfo = nullptr;
-   descriptorWrite.pTexelBufferView = nullptr;
+   VkDescriptorImageInfo imageInfo = {};
+   imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+   imageInfo.imageView = _textureImageView;
+   imageInfo.sampler = _textureSampler;
 
-   vkUpdateDescriptorSets( _device, 1, &descriptorWrite, 0, nullptr );
+   std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+
+   descriptorWrites[ 0 ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+   descriptorWrites[ 0 ].dstSet = _descriptorSet;
+   descriptorWrites[ 0 ].dstBinding = 0;
+   descriptorWrites[ 0 ].dstArrayElement = 0;
+   descriptorWrites[ 0 ].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+   descriptorWrites[ 0 ].descriptorCount = 1;
+   descriptorWrites[ 0 ].pBufferInfo = &bufferInfo;
+   descriptorWrites[ 0 ].pImageInfo = nullptr;
+   descriptorWrites[ 0 ].pTexelBufferView = nullptr;
+
+   descriptorWrites[ 1 ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+   descriptorWrites[ 1 ].dstSet = _descriptorSet;
+   descriptorWrites[ 1 ].dstBinding = 1;
+   descriptorWrites[ 1 ].dstArrayElement = 0;
+   descriptorWrites[ 1 ].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+   descriptorWrites[ 1 ].descriptorCount = 1;
+   descriptorWrites[ 1 ].pBufferInfo = nullptr;
+   descriptorWrites[ 1 ].pImageInfo = &imageInfo;
+   descriptorWrites[ 1 ].pTexelBufferView = nullptr;
+
+   vkUpdateDescriptorSets( _device, static_cast<uint32_t>( descriptorWrites.size() ),
+                           descriptorWrites.data(), 0, nullptr );
 
    return true;
 }
@@ -796,6 +927,46 @@ void VulkanGraphic::createBuffer( VkDeviceSize size,
    vkBindBufferMemory( _device, buffer, bufferMemory, 0 );
 }
 
+void VulkanGraphic::createImage( uint32_t width,
+                                 uint32_t height,
+                                 VkFormat format,
+                                 VkImageTiling tiling,
+                                 VkImageUsageFlags usage,
+                                 VkMemoryPropertyFlags properties,
+                                 VDeleter<VkImage>& image,
+                                 VDeleter<VkDeviceMemory>& imageMemory )
+{
+   VkImageCreateInfo imageInfo = {};
+   imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+   imageInfo.imageType = VK_IMAGE_TYPE_2D;
+   imageInfo.extent.width = width;
+   imageInfo.extent.height = height;
+   imageInfo.extent.depth = 1;
+   imageInfo.mipLevels = 1;
+   imageInfo.arrayLayers = 1;
+   imageInfo.format = format;
+   imageInfo.tiling = tiling;
+   imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+   imageInfo.usage = usage;
+   imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+   imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+   imageInfo.flags = 0;  // Optional
+
+   VK_CALL( vkCreateImage( _device, &imageInfo, nullptr, &image ) );
+
+   VkMemoryRequirements memRequirements;
+   vkGetImageMemoryRequirements( _device, image, &memRequirements );
+
+   VkMemoryAllocateInfo allocInfo = {};
+   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+   allocInfo.allocationSize = memRequirements.size;
+   allocInfo.memoryTypeIndex =
+      findMemoryType( _physDevice, memRequirements.memoryTypeBits, properties );
+
+   VK_CALL( vkAllocateMemory( _device, &allocInfo, nullptr, &imageMemory ) );
+
+   VK_CALL( vkBindImageMemory( _device, image, imageMemory, 0 ) );
+}
 
 bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
 {
@@ -855,6 +1026,88 @@ bool VulkanGraphic::createUniformBuffer()
                  _uniformStagingBuffer, _uniformStagingBufferMemory );
    createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _uniformBuffer, _uniformBufferMemory );
+
+   return true;
+}
+
+bool VulkanGraphic::createTextureImage()
+{
+   int width, height, channels;
+   stbi_uc* pixels = stbi_load( "../textures/tex.jpg", &width, &height, &channels, STBI_rgb_alpha );
+   VkDeviceSize size = width * height * 4;
+
+   assert( pixels && "Error loading texture" );
+
+   createImage( width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR,
+                VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                _stagingImage, _stagingImageMemory );
+
+   void* data;
+   vkMapMemory( _device, _stagingImageMemory, 0, size, 0, &data );
+   memcpy( data, pixels, (size_t)size );
+   vkUnmapMemory( _device, _stagingImageMemory );
+
+   stbi_image_free( pixels );
+
+   createImage( width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _textureImage, _textureImageMemory );
+
+   transitionImageLayout( _stagingImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _device, _commandPool,
+                          _graphicQueue.handle );
+   transitionImageLayout( _textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _device, _commandPool,
+                          _graphicQueue.handle );
+   copyImage( _stagingImage, _textureImage, width, height, _device, _commandPool,
+              _graphicQueue.handle );
+   transitionImageLayout(
+      _textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _device, _commandPool, _graphicQueue.handle );
+
+   return true;
+}
+
+bool VulkanGraphic::createTextureImageView()
+{
+   VkImageViewCreateInfo viewInfo = {};
+   viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+   viewInfo.image = _textureImage;
+   viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+   viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+   viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+   viewInfo.subresourceRange.baseMipLevel = 0;
+   viewInfo.subresourceRange.levelCount = 1;
+   viewInfo.subresourceRange.baseArrayLayer = 0;
+   viewInfo.subresourceRange.layerCount = 1;
+
+   VK_CALL( vkCreateImageView( _device, &viewInfo, nullptr, &_textureImageView ) );
+
+   return true;
+}
+
+bool VulkanGraphic::createTextureSampler()
+{
+   VkSamplerCreateInfo samplerInfo = {};
+   samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+   samplerInfo.magFilter = VK_FILTER_LINEAR;
+   samplerInfo.minFilter = VK_FILTER_LINEAR;
+   samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+   samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+   samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+   samplerInfo.anisotropyEnable = VK_TRUE;
+   samplerInfo.maxAnisotropy = 16;
+   samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+   samplerInfo.unnormalizedCoordinates = VK_FALSE;
+   samplerInfo.compareEnable = VK_FALSE;
+   samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+   samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+   samplerInfo.mipLodBias = 0.0f;
+   samplerInfo.minLod = 0.0f;
+   samplerInfo.maxLod = 0.0f;
+
+   VK_CALL( vkCreateSampler( _device, &samplerInfo, nullptr, &_textureSampler ) );
 
    return true;
 }

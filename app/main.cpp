@@ -134,28 +134,31 @@ void updateCoreDll()
 }
 
 #include "vertex.h"
-const std::vector<Vertex> vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-                                      {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-                                      {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-                                      {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}};
+const std::vector<Vertex> vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                                      {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                                      {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+                                      {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
 const std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
 
 static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
 {
    VERIFY( VK.createSurface( window ), "Cannot create vulkan surface." );
    VERIFY( VK.getPysicalDevices(), "Cannot get physical device." );
-   VERIFY( VK.createLogicalDevice(), "Cannot create logical device." );
+   VERIFY( VK.createLogicalDevice(), "Cannot create logical evice." );
    VERIFY( VK.createSwapChain(), "Cannot create swap chain." );
    VERIFY( VK.createRenderPass(), "Cannot create a render pass." );
    VERIFY( VK.createDescriptorSetLayout(), "Cannot create descriptor set layout" );
    VERIFY( VK.createPipeline(), "Cannot create the pipeline." );
    VERIFY( VK.createFrameBuffers(), "Cannot create frame buffer." );
+   VERIFY( VK.createCommandPool(), "Cannot create command pool." );
+   VERIFY( VK.createTextureImage(), "Cannot create texture" );
+   VERIFY( VK.createTextureImageView(), "Cannot create texture view" );
+   VERIFY( VK.createTextureSampler(), "Cannot create texture sampler" );
+   VERIFY( VK.createVertexBuffer( vertices ), "Cannot create vertex buffer." );
+   VERIFY( VK.createIndexBuffer( indices ), "Cannot create index buffer." );
    VERIFY( VK.createUniformBuffer(), "Cannot create uniform buffer." );
    VERIFY( VK.createDescriptorPool(), "Cannot create descriptor pool." );
    VERIFY( VK.createDescriptorSet(), "Cannot create descriptor set." );
-   VERIFY( VK.createCommandPool(), "Cannot create command pool." );
-   VERIFY( VK.createVertexBuffer( vertices ), "Cannot create vertex buffer." );
-   VERIFY( VK.createIndexBuffer( indices ), "Cannot create index buffer." );
    VERIFY( VK.createCommandBuffers(), "Cannot create frame buffer." );
    VERIFY( VK.createSemaphores(), "Cannot create semaphores." );
 }

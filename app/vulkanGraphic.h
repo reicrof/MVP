@@ -44,6 +44,9 @@ class VulkanGraphic
    bool createDescriptorSetLayout();
    bool createDescriptorSet();
    bool createUniformBuffer();
+   bool createTextureImage();
+   bool createTextureImageView();
+   bool createTextureSampler();
    void updateUBO( const UniformBufferObject& ubo );
 
    void render();
@@ -63,6 +66,15 @@ class VulkanGraphic
                       VkMemoryPropertyFlags properties,
                       VDeleter<VkBuffer>& buffer,
                       VDeleter<VkDeviceMemory>& bufferMemory );
+   void createImage( uint32_t width,
+                     uint32_t height,
+                     VkFormat format,
+                     VkImageTiling tiling,
+                     VkImageUsageFlags usage,
+                     VkMemoryPropertyFlags properties,
+                     VDeleter<VkImage>& image,
+                     VDeleter<VkDeviceMemory>& imageMemory );
+
    bool createShaderModule( const std::string& shaderPath, VDeleter<VkShaderModule>& shaderModule );
    void recreateSwapChainIfNotValid( VkResult res );
 
@@ -97,6 +109,14 @@ class VulkanGraphic
    VDeleter<VkDeviceMemory> _uniformStagingBufferMemory{_device, vkFreeMemory};
    VDeleter<VkBuffer> _uniformBuffer{_device, vkDestroyBuffer};
    VDeleter<VkDeviceMemory> _uniformBufferMemory{_device, vkFreeMemory};
+
+   VDeleter<VkImage> _stagingImage{_device, vkDestroyImage};
+   VDeleter<VkDeviceMemory> _stagingImageMemory{_device, vkFreeMemory};
+
+   VDeleter<VkImage> _textureImage{_device, vkDestroyImage};
+   VDeleter<VkDeviceMemory> _textureImageMemory{_device, vkFreeMemory};
+   VDeleter<VkImageView> _textureImageView{_device, vkDestroyImageView};
+   VDeleter<VkSampler> _textureSampler{_device, vkDestroySampler};
 
    VDeleter<VkDebugReportCallbackEXT> _validationCallback{_instance, DestroyDebugReportCallbackEXT};
    std::unique_ptr<std::ofstream> _outErrorFile;
