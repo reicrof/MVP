@@ -27,6 +27,10 @@
 #define RTLD_GLOBAL 4
 #endif
 
+using namespace std::chrono_literals;
+
+static constexpr int WINDOW_TITLE_SIZE = 256;
+
 void* loadSharedLibrary( const char* libNameNoExt, int iMode = 2 )
 {
    std::string sDllName = libNameNoExt;
@@ -87,7 +91,7 @@ static void loadCoreFunctions()
       freeSharedLibrary( coreDll );
    }
 
-   int res = CopyFile( coreDllName, tempCoreDllName, FALSE );
+   CopyFile( coreDllName, tempCoreDllName, FALSE );
    coreDll = loadSharedLibrary( "../core/coreRunning" );
    lastLoadedCoreDllWriteTime = getFileTimeFromFile( coreDllName );
    // coreDll = loadSharedLibrary("../../core/core");
@@ -134,11 +138,16 @@ void updateCoreDll()
 }
 
 #include "vertex.h"
-const std::vector<Vertex> vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-                                      {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-                                      {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-                                      {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
-const std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0};
+const std::vector<Vertex> vertices = {{{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                                      {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                                      {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+                                      {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+
+                                      {{-0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                                      {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                                      {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+                                      {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
+const std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
 
 static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
 {
@@ -149,11 +158,12 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createRenderPass(), "Cannot create a render pass." );
    VERIFY( VK.createDescriptorSetLayout(), "Cannot create descriptor set layout" );
    VERIFY( VK.createPipeline(), "Cannot create the pipeline." );
-   VERIFY( VK.createFrameBuffers(), "Cannot create frame buffer." );
    VERIFY( VK.createCommandPool(), "Cannot create command pool." );
    VERIFY( VK.createTextureImage(), "Cannot create texture" );
    VERIFY( VK.createTextureImageView(), "Cannot create texture view" );
    VERIFY( VK.createTextureSampler(), "Cannot create texture sampler" );
+   VERIFY( VK.createDepthImage(), "Cannot create depth image." );
+   VERIFY( VK.createFrameBuffers(), "Cannot create frame buffer." );
    VERIFY( VK.createVertexBuffer( vertices ), "Cannot create vertex buffer." );
    VERIFY( VK.createIndexBuffer( indices ), "Cannot create index buffer." );
    VERIFY( VK.createUniformBuffer(), "Cannot create uniform buffer." );
@@ -189,7 +199,7 @@ int main()
    loadCoreFunctions();
 
    glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
-   GLFWwindow* window = glfwCreateWindow( 800, 600, "Vulkan window", nullptr, nullptr );
+   GLFWwindow* window = glfwCreateWindow( 800, 600, "MVP", nullptr, nullptr );
 
    VERIFY( window, "Could not create GLFW window." );
 
@@ -209,6 +219,11 @@ int main()
 
    UniformBufferObject ubo = {};
 
+   char windowTitle[ WINDOW_TITLE_SIZE ] = {};
+   auto simStartTime = std::chrono::steady_clock::now();
+   auto nextFpsPrintTime = 1s;
+   unsigned frameRendered = 0;
+
    while ( !glfwWindowShouldClose( window ) )
    {
       updateCoreDll();
@@ -217,6 +232,15 @@ int main()
       VK.updateUBO( ubo );
       // std::cout << ptr() << std::endl;
       VK.render();
+
+      ++frameRendered;
+      if ( std::chrono::steady_clock::now() - simStartTime > nextFpsPrintTime )
+      {
+         std::snprintf( windowTitle, WINDOW_TITLE_SIZE, "MVP - %i FPS", frameRendered );
+         glfwSetWindowTitle( window, windowTitle );
+         frameRendered = 0;
+         nextFpsPrintTime += 1s;
+      }
    }
 
    glfwDestroyWindow( window );

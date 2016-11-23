@@ -47,6 +47,7 @@ class VulkanGraphic
    bool createTextureImage();
    bool createTextureImageView();
    bool createTextureSampler();
+   bool createDepthImage();
    void updateUBO( const UniformBufferObject& ubo );
 
    void render();
@@ -117,6 +118,10 @@ class VulkanGraphic
    VDeleter<VkDeviceMemory> _textureImageMemory{_device, vkFreeMemory};
    VDeleter<VkImageView> _textureImageView{_device, vkDestroyImageView};
    VDeleter<VkSampler> _textureSampler{_device, vkDestroySampler};
+
+   VDeleter<VkImage> _depthImage{_device, vkDestroyImage};
+   VDeleter<VkDeviceMemory> _depthImageMemory{_device, vkFreeMemory};
+   VDeleter<VkImageView> _depthImageView{_device, vkDestroyImageView};
 
    VDeleter<VkDebugReportCallbackEXT> _validationCallback{_instance, DestroyDebugReportCallbackEXT};
    std::unique_ptr<std::ofstream> _outErrorFile;
