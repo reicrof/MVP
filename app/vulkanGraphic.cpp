@@ -531,6 +531,17 @@ bool VulkanGraphic::createSwapChain()
    return true;
 }
 
+bool VulkanGraphic::createMemoryPool()
+{
+   _deviceLocalMemPool = std::make_unique<VMemoryPool>( _physDevice, _device, 1024 * 1024,
+                                                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+   _hostVisibleMemPool = std::make_unique<VMemoryPool>(
+      _physDevice, _device, 1024 * 1024,
+      ( VkMemoryPropertyFlagBits )( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ) );
+   return true;
+}
+
 bool VulkanGraphic::createRenderPass()
 {
    // Color attachement
@@ -975,11 +986,9 @@ bool VulkanGraphic::createSemaphores()
    return true;
 }
 
-void VulkanGraphic::createBuffer( VkDeviceSize size,
-                                  VkBufferUsageFlags usage,
-                                  VkMemoryPropertyFlags properties,
-                                  VDeleter<VkBuffer>& buffer,
-                                  VDeleter<VkDeviceMemory>& bufferMemory )
+VMemAlloc VulkanGraphic::createDeviceBuffer( VkDeviceSize size,
+                                             VkBufferUsageFlags usage,
+                                             VDeleter<VkBuffer>& buffer )
 {
    VkBufferCreateInfo bufferInfo = {};
    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -992,15 +1001,35 @@ void VulkanGraphic::createBuffer( VkDeviceSize size,
    VkMemoryRequirements memRequirements;
    vkGetBufferMemoryRequirements( _device, buffer, &memRequirements );
 
-   VkMemoryAllocateInfo allocInfo = {};
-   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-   allocInfo.allocationSize = memRequirements.size;
-   allocInfo.memoryTypeIndex =
-      findMemoryType( _physDevice, memRequirements.memoryTypeBits, properties );
+   const VMemAlloc alloc =
+      _deviceLocalMemPool->allocateMemory( memRequirements.size, memRequirements.alignment );
 
-   VK_CALL( vkAllocateMemory( _device, &allocInfo, nullptr, &bufferMemory ) );
+   vkBindBufferMemory( _device, buffer, alloc.memory, alloc.offset );
 
-   vkBindBufferMemory( _device, buffer, bufferMemory, 0 );
+   return alloc;
+}
+
+VMemAlloc VulkanGraphic::createHostBuffer( VkDeviceSize size,
+                                           VkBufferUsageFlags usage,
+                                           VDeleter<VkBuffer>& buffer )
+{
+   VkBufferCreateInfo bufferInfo = {};
+   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+   bufferInfo.size = size;
+   bufferInfo.usage = usage;
+   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+   VK_CALL( vkCreateBuffer( _device, &bufferInfo, nullptr, &buffer ) );
+
+   VkMemoryRequirements memRequirements;
+   vkGetBufferMemoryRequirements( _device, buffer, &memRequirements );
+
+   const VMemAlloc alloc =
+      _hostVisibleMemPool->allocateMemory( memRequirements.size, memRequirements.alignment );
+
+   vkBindBufferMemory( _device, buffer, alloc.memory, alloc.offset );
+
+   return alloc;
 }
 
 void VulkanGraphic::createImage( uint32_t width,
@@ -1050,16 +1079,16 @@ bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
 
    VDeleter<VkBuffer> stagingBuffer{_device, vkDestroyBuffer};
    VDeleter<VkDeviceMemory> stagingBufferMemory{_device, vkFreeMemory};
-   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 stagingBuffer, stagingBufferMemory );
+   VMemAlloc hostBuffer =
+      createHostBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, stagingBuffer );
    void* data;
-   vkMapMemory( _device, stagingBufferMemory, 0, bufferSize, 0, &data );
+   VK_CALL( vkMapMemory( _device, hostBuffer.memory, hostBuffer.offset, bufferSize, 0, &data ) );
    memcpy( data, vertices.data(), bufferSize );
-   vkUnmapMemory( _device, stagingBufferMemory );
+   vkUnmapMemory( _device, hostBuffer.memory );
 
-   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _vertexBuffer, _vertexBufferMemory );
+   VMemAlloc deviceBuffer = createDeviceBuffer(
+      bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+      _vertexBuffer );
 
    copyBuffer( stagingBuffer, _vertexBuffer, bufferSize, _device, _commandPool,
                _graphicQueue.handle );
@@ -1074,16 +1103,16 @@ bool VulkanGraphic::createIndexBuffer( const std::vector<uint32_t>& indices )
    const size_t bufferSize = indices.size() * sizeof( uint32_t );
    VDeleter<VkBuffer> stagingBuffer{_device, vkDestroyBuffer};
    VDeleter<VkDeviceMemory> stagingBufferMemory{_device, vkFreeMemory};
-   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 stagingBuffer, stagingBufferMemory );
+   VMemAlloc hostBuffer = 
+	   createHostBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, stagingBuffer );
    void* data;
-   vkMapMemory( _device, stagingBufferMemory, 0, bufferSize, 0, &data );
+   VK_CALL( vkMapMemory( _device, hostBuffer.memory, hostBuffer.offset, bufferSize, 0, &data ) );
    memcpy( data, indices.data(), bufferSize );
    vkUnmapMemory( _device, stagingBufferMemory );
 
-   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _indexBuffer, _indexBufferMemory );
+   createDeviceBuffer( bufferSize,
+                       VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                       _indexBuffer );
 
    copyBuffer( stagingBuffer, _indexBuffer, bufferSize, _device, _commandPool,
                _graphicQueue.handle );
@@ -1097,11 +1126,10 @@ bool VulkanGraphic::createUniformBuffer()
 {
    VkDeviceSize bufferSize = sizeof( UniformBufferObject );
 
-   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 _uniformStagingBuffer, _uniformStagingBufferMemory );
-   createBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _uniformBuffer, _uniformBufferMemory );
+   _uniformStagingBufferMemory = createHostBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, _uniformStagingBuffer );
+   createDeviceBuffer( bufferSize,
+                       VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                       _uniformBuffer );
 
    return true;
 }
@@ -1195,9 +1223,9 @@ bool VulkanGraphic::createDepthImage()
 void VulkanGraphic::updateUBO( const UniformBufferObject& ubo )
 {
    void* data;
-   vkMapMemory( _device, _uniformStagingBufferMemory, 0, sizeof( ubo ), 0, &data );
+   vkMapMemory( _device, _uniformStagingBufferMemory.memory, _uniformStagingBufferMemory.offset, sizeof( ubo ), 0, &data );
    memcpy( data, &ubo, sizeof( ubo ) );
-   vkUnmapMemory( _device, _uniformStagingBufferMemory );
+   vkUnmapMemory( _device, _uniformStagingBufferMemory.memory);
 
    copyBuffer( _uniformStagingBuffer, _uniformBuffer, sizeof( ubo ), _device, _commandPool,
                _graphicQueue.handle );

@@ -35,6 +35,14 @@ class VDeleter
       this->deleter = [&device, deletef]( T obj ) { deletef( device, obj, nullptr ); };
    }
 
+   T* get() {
+	   return &object;
+   }
+
+   const T* operator &() const {
+	   return &object;
+   }
+
    ~VDeleter() { cleanup(); }
    T* operator&()
    {

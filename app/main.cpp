@@ -155,6 +155,7 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.getPysicalDevices(), "Cannot get physical device." );
    VERIFY( VK.createLogicalDevice(), "Cannot create logical evice." );
    VERIFY( VK.createSwapChain(), "Cannot create swap chain." );
+   VERIFY(VK.createMemoryPool(), "Cannot create buffer memory pool.");
    VERIFY( VK.createRenderPass(), "Cannot create a render pass." );
    VERIFY( VK.createDescriptorSetLayout(), "Cannot create descriptor set layout" );
    VERIFY( VK.createPipeline(), "Cannot create the pipeline." );

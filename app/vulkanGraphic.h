@@ -4,6 +4,7 @@
 #include "swapChain.h"
 #include "vertex.h"
 #include "vkUtils.h"
+#include "vMemoryPool.h"
 #include <fstream>
 #include <memory>
 #include <vector>
@@ -32,6 +33,7 @@ class VulkanGraphic
    bool createLogicalDevice();
    bool createSurface( GLFWwindow* window );
    bool createSwapChain();
+   bool createMemoryPool();
    bool createRenderPass();
    bool createPipeline();
    bool createFrameBuffers();
@@ -62,11 +64,12 @@ class VulkanGraphic
       VkQueue handle;
    };
 
-   void createBuffer( VkDeviceSize size,
-                      VkBufferUsageFlags usage,
-                      VkMemoryPropertyFlags properties,
-                      VDeleter<VkBuffer>& buffer,
-                      VDeleter<VkDeviceMemory>& bufferMemory );
+   VMemAlloc createDeviceBuffer(VkDeviceSize size,
+			   VkBufferUsageFlags usage,
+			   VDeleter<VkBuffer>& buffer);
+   VMemAlloc createHostBuffer(VkDeviceSize size,
+	   VkBufferUsageFlags usage,
+	   VDeleter<VkBuffer>& buffer);
    void createImage( uint32_t width,
                      uint32_t height,
                      VkFormat format,
@@ -100,16 +103,17 @@ class VulkanGraphic
    VDeleter<VkSemaphore> _renderFinishedSemaphore{_device, vkDestroySemaphore};
 
    VDeleter<VkBuffer> _vertexBuffer{_device, vkDestroyBuffer};
-   VDeleter<VkDeviceMemory> _vertexBufferMemory{_device, vkFreeMemory};
    VDeleter<VkBuffer> _indexBuffer{_device, vkDestroyBuffer};
-   VDeleter<VkDeviceMemory> _indexBufferMemory{_device, vkFreeMemory};
+
+   std::unique_ptr< VMemoryPool > _deviceLocalMemPool;
+   std::unique_ptr< VMemoryPool > _hostVisibleMemPool;
    uint32_t _verticesCount;
    uint32_t _indexCount;
 
    VDeleter<VkBuffer> _uniformStagingBuffer{_device, vkDestroyBuffer};
-   VDeleter<VkDeviceMemory> _uniformStagingBufferMemory{_device, vkFreeMemory};
+   VMemAlloc _uniformStagingBufferMemory;
    VDeleter<VkBuffer> _uniformBuffer{_device, vkDestroyBuffer};
-   VDeleter<VkDeviceMemory> _uniformBufferMemory{_device, vkFreeMemory};
+   VMemAlloc _uniformBufferMemory;
 
    VDeleter<VkImage> _stagingImage{_device, vkDestroyImage};
    VDeleter<VkDeviceMemory> _stagingImageMemory{_device, vkFreeMemory};
