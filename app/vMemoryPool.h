@@ -34,6 +34,16 @@ class VMemoryPool
    }
 
    VMemAlloc alloc(uint64_t size, uint64_t alignment) { return VMemAlloc{ *_memory.get(), _pool.alloc(size, alignment) }; }
+   void free(VMemAlloc& mem)
+   {
+	   assert(mem.memory == *_memory.get());
+	   _pool.free(mem.offset);
+#ifdef DEBUG
+	   mem.memory = nullptr;
+	   mem.offset = -1;
+#endif // DEBUG
+
+   }
    operator VkDeviceMemory() { return *_memory.get(); }
   private:
    uint32_t findMemoryType( VkPhysicalDeviceMemoryProperties memProperties,

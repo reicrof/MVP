@@ -18,7 +18,7 @@ bool memoryPoolAllocateAll()
 	MemoryPool<size, 1024> pool;
 
 	uint64_t allocs[size];
-	for (int i = 0; i < size; ++i)
+	for (int i = 0; i < size-1; ++i)
 	{
 		allocs[i] = pool.alloc(1, 1);
 	}
@@ -102,10 +102,10 @@ bool memoryRandomAllocsRandomAlignRandomFree()
 		uint64_t align = randNum(1, 512);
 		allocs.push_back( pool.alloc(size, align) );
 
-		auto numRan = randNum(1, allocs.size());
+		auto numRan = randNum(1, (int)allocs.size());
 		if (numRan == 0 || i % numRan)
 		{
-			auto allocToRemove = randNum(0, allocs.size() - 1);
+			auto allocToRemove = randNum(0, (int)allocs.size() - 1);
 			pool.free(allocs[allocToRemove]);
 			allocs.erase(allocs.begin() + allocToRemove);
 		}
@@ -138,7 +138,7 @@ int main()
 	rng.seed(seed);
 
 	bool success = true;
-	for (int i = 0; i < 2000; ++i)
+	for (int i = 0; i < 5000; ++i)
 	{
 		success &= TEST(memoryPoolAllocateAll);
 		success &= TEST(memoryPoolAllocateAllAndDeallocateAll);

@@ -1085,7 +1085,7 @@ bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
    memcpy( data, vertices.data(), bufferSize );
    vkUnmapMemory( _device, hostBuffer.memory );
 
-   /*VMemAlloc deviceBuffer = */ createDeviceBuffer(
+   createDeviceBuffer(
       bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
       _vertexBuffer );
 
@@ -1107,7 +1107,7 @@ bool VulkanGraphic::createIndexBuffer( const std::vector<uint32_t>& indices )
    void* data;
    VK_CALL( vkMapMemory( _device, hostBuffer.memory, hostBuffer.offset, bufferSize, 0, &data ) );
    memcpy( data, indices.data(), bufferSize );
-   vkUnmapMemory( _device, stagingBufferMemory );
+   vkUnmapMemory( _device, hostBuffer.memory);
 
    createDeviceBuffer( bufferSize,
                        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
