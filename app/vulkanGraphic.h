@@ -64,12 +64,12 @@ class VulkanGraphic
       VkQueue handle;
    };
 
-   VMemAlloc createDeviceBuffer(VkDeviceSize size,
-			   VkBufferUsageFlags usage,
-			   VDeleter<VkBuffer>& buffer);
-   VMemAlloc createHostBuffer(VkDeviceSize size,
-	   VkBufferUsageFlags usage,
-	   VDeleter<VkBuffer>& buffer);
+   VMemAlloc createDeviceBuffer( VkDeviceSize size,
+                                 VkBufferUsageFlags usage,
+                                 VDeleter<VkBuffer>& buffer );
+   VMemAlloc createHostBuffer( VkDeviceSize size,
+                               VkBufferUsageFlags usage,
+                               VDeleter<VkBuffer>& buffer );
    void createImage( uint32_t width,
                      uint32_t height,
                      VkFormat format,
@@ -105,15 +105,15 @@ class VulkanGraphic
    VDeleter<VkBuffer> _vertexBuffer{_device, vkDestroyBuffer};
    VDeleter<VkBuffer> _indexBuffer{_device, vkDestroyBuffer};
 
-   std::unique_ptr< VMemoryPool > _deviceLocalMemPool;
-   std::unique_ptr< VMemoryPool > _hostVisibleMemPool;
+   std::unique_ptr<VMemoryPool<1024 * 1024>> _deviceLocalMemPool;
+   std::unique_ptr<VMemoryPool<1024 * 1024>> _hostVisibleMemPool;
    uint32_t _verticesCount;
    uint32_t _indexCount;
 
    VDeleter<VkBuffer> _uniformStagingBuffer{_device, vkDestroyBuffer};
    VMemAlloc _uniformStagingBufferMemory;
    VDeleter<VkBuffer> _uniformBuffer{_device, vkDestroyBuffer};
-   VMemAlloc _uniformBufferMemory;
+   // VMemAlloc _uniformBufferMemory;
 
    VDeleter<VkImage> _stagingImage{_device, vkDestroyImage};
    VDeleter<VkDeviceMemory> _stagingImageMemory{_device, vkFreeMemory};

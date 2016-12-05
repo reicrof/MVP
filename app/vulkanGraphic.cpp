@@ -533,12 +533,11 @@ bool VulkanGraphic::createSwapChain()
 
 bool VulkanGraphic::createMemoryPool()
 {
-   _deviceLocalMemPool = std::make_unique<VMemoryPool>( _physDevice, _device, 1024 * 1024,
-                                                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-   _hostVisibleMemPool = std::make_unique<VMemoryPool>(
-      _physDevice, _device, 1024 * 1024,
-      ( VkMemoryPropertyFlagBits )( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ) );
+   _deviceLocalMemPool = std::make_unique<VMemoryPool<1024 * 1024>>(
+      _physDevice, _device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+   _hostVisibleMemPool = std::make_unique<VMemoryPool<1024 * 1024>>(
+      _physDevice, _device, ( VkMemoryPropertyFlagBits )( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ) );
    return true;
 }
 
@@ -1002,7 +1001,7 @@ VMemAlloc VulkanGraphic::createDeviceBuffer( VkDeviceSize size,
    vkGetBufferMemoryRequirements( _device, buffer, &memRequirements );
 
    const VMemAlloc alloc =
-      _deviceLocalMemPool->allocateMemory( memRequirements.size, memRequirements.alignment );
+      _deviceLocalMemPool->alloc( memRequirements.size, memRequirements.alignment );
 
    vkBindBufferMemory( _device, buffer, alloc.memory, alloc.offset );
 
@@ -1025,7 +1024,7 @@ VMemAlloc VulkanGraphic::createHostBuffer( VkDeviceSize size,
    vkGetBufferMemoryRequirements( _device, buffer, &memRequirements );
 
    const VMemAlloc alloc =
-      _hostVisibleMemPool->allocateMemory( memRequirements.size, memRequirements.alignment );
+      _hostVisibleMemPool->alloc( memRequirements.size, memRequirements.alignment );
 
    vkBindBufferMemory( _device, buffer, alloc.memory, alloc.offset );
 
@@ -1086,7 +1085,7 @@ bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
    memcpy( data, vertices.data(), bufferSize );
    vkUnmapMemory( _device, hostBuffer.memory );
 
-   VMemAlloc deviceBuffer = createDeviceBuffer(
+   /*VMemAlloc deviceBuffer = */ createDeviceBuffer(
       bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
       _vertexBuffer );
 
@@ -1103,8 +1102,8 @@ bool VulkanGraphic::createIndexBuffer( const std::vector<uint32_t>& indices )
    const size_t bufferSize = indices.size() * sizeof( uint32_t );
    VDeleter<VkBuffer> stagingBuffer{_device, vkDestroyBuffer};
    VDeleter<VkDeviceMemory> stagingBufferMemory{_device, vkFreeMemory};
-   VMemAlloc hostBuffer = 
-	   createHostBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, stagingBuffer );
+   VMemAlloc hostBuffer =
+      createHostBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, stagingBuffer );
    void* data;
    VK_CALL( vkMapMemory( _device, hostBuffer.memory, hostBuffer.offset, bufferSize, 0, &data ) );
    memcpy( data, indices.data(), bufferSize );
@@ -1126,7 +1125,8 @@ bool VulkanGraphic::createUniformBuffer()
 {
    VkDeviceSize bufferSize = sizeof( UniformBufferObject );
 
-   _uniformStagingBufferMemory = createHostBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, _uniformStagingBuffer );
+   _uniformStagingBufferMemory =
+      createHostBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, _uniformStagingBuffer );
    createDeviceBuffer( bufferSize,
                        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                        _uniformBuffer );
@@ -1223,9 +1223,10 @@ bool VulkanGraphic::createDepthImage()
 void VulkanGraphic::updateUBO( const UniformBufferObject& ubo )
 {
    void* data;
-   vkMapMemory( _device, _uniformStagingBufferMemory.memory, _uniformStagingBufferMemory.offset, sizeof( ubo ), 0, &data );
+   vkMapMemory( _device, _uniformStagingBufferMemory.memory, _uniformStagingBufferMemory.offset,
+                sizeof( ubo ), 0, &data );
    memcpy( data, &ubo, sizeof( ubo ) );
-   vkUnmapMemory( _device, _uniformStagingBufferMemory.memory);
+   vkUnmapMemory( _device, _uniformStagingBufferMemory.memory );
 
    copyBuffer( _uniformStagingBuffer, _uniformBuffer, sizeof( ubo ), _device, _commandPool,
                _graphicQueue.handle );
