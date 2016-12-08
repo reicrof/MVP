@@ -9,8 +9,8 @@
 template <typename MEMORY>
 struct MemAlloc
 {
-	MEMORY memory;
-	uint64_t offset;
+   MEMORY memory;
+   uint64_t offset;
 };
 
 using VMemAlloc = MemAlloc<VkDeviceMemory>;
@@ -20,8 +20,8 @@ class VMemoryPool
 {
   public:
    VMemoryPool( const VkPhysicalDevice& physDevice,
-                          const VDeleter<VkDevice>& device,
-                          VkMemoryPropertyFlagBits type )
+                const VDeleter<VkDevice>& device,
+                VkMemoryPropertyFlagBits type )
        : _physDevice( physDevice ), _device( device )
    {
       vkGetPhysicalDeviceMemoryProperties( physDevice, &_memProperties );
@@ -33,16 +33,18 @@ class VMemoryPool
       VK_CALL( vkAllocateMemory( _device, &allocInfo, nullptr, &_memory ) );
    }
 
-   VMemAlloc alloc(uint64_t size, uint64_t alignment) { return VMemAlloc{ *_memory.get(), _pool.alloc(size, alignment) }; }
-   void free(VMemAlloc& mem)
+   VMemAlloc alloc( uint64_t size, uint64_t alignment )
    {
-	   assert(mem.memory == *_memory.get());
-	   _pool.free(mem.offset);
+      return VMemAlloc{*_memory.get(), _pool.alloc( size, alignment )};
+   }
+   void free( VMemAlloc& mem )
+   {
+      assert( mem.memory == *_memory.get() );
+      _pool.free( mem.offset );
 #ifdef DEBUG
-	   mem.memory = nullptr;
-	   mem.offset = -1;
-#endif // DEBUG
-
+      mem.memory = nullptr;
+      mem.offset = -1;
+#endif  // DEBUG
    }
    operator VkDeviceMemory() { return *_memory.get(); }
   private:

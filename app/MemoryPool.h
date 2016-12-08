@@ -25,15 +25,16 @@ class MemoryPool
       // Get the first free chunk that can contains the requested allocation
       auto it = _allocatedChunks.begin();
       const auto endIt = _allocatedChunks.cend();
-	  const auto minChunkSize = (alignment - 1) + size;
+      const auto minChunkSize = ( alignment - 1 ) + size;
       while ( !it->isFree || minChunkSize > it->size )
       {
          ++it;
-         assert( it != endIt );         
+         assert( it != endIt );
       }
 
-	  // Get padding requirement for chunk. Equivalent of : ceil( cur / align ) * align
-	  uint64_t alignmentPadding = ((it->offset + alignment - 1) / alignment * alignment) - it->offset;
+      // Get padding requirement for chunk. Equivalent of : ceil( cur / align ) * align
+      uint64_t alignmentPadding =
+         ( ( it->offset + alignment - 1 ) / alignment * alignment ) - it->offset;
 
       // The free chunk becomes the new allocated chunk. The remaining space is
       // splitted to create a new free chunk.
@@ -47,7 +48,7 @@ class MemoryPool
          it->offset += alignmentPadding;
 
          // We gave the space to the previous chunk. If it was used,
-		 // we need to adjust the remaining free space.
+         // we need to adjust the remaining free space.
          if ( !prevIt->isFree )
          {
             _freeSpace -= alignmentPadding;

@@ -985,114 +985,30 @@ bool VulkanGraphic::createSemaphores()
    return true;
 }
 
-VMemAlloc VulkanGraphic::createDeviceBuffer( VkDeviceSize size,
-                                             VkBufferUsageFlags usage,
-                                             VDeleter<VkBuffer>& buffer )
-{
-   VkBufferCreateInfo bufferInfo = {};
-   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-   bufferInfo.size = size;
-   bufferInfo.usage = usage;
-   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-   VK_CALL( vkCreateBuffer( _device, &bufferInfo, nullptr, &buffer ) );
-
-   VkMemoryRequirements memRequirements;
-   vkGetBufferMemoryRequirements( _device, buffer, &memRequirements );
-
-   const VMemAlloc alloc =
-      _deviceLocalMemPool->alloc( memRequirements.size, memRequirements.alignment );
-
-   vkBindBufferMemory( _device, buffer, alloc.memory, alloc.offset );
-
-   return alloc;
-}
-
-VMemAlloc VulkanGraphic::createHostBuffer( VkDeviceSize size,
-                                           VkBufferUsageFlags usage,
-                                           VDeleter<VkBuffer>& buffer )
-{
-   VkBufferCreateInfo bufferInfo = {};
-   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-   bufferInfo.size = size;
-   bufferInfo.usage = usage;
-   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-   VK_CALL( vkCreateBuffer( _device, &bufferInfo, nullptr, &buffer ) );
-
-   VkMemoryRequirements memRequirements;
-   vkGetBufferMemoryRequirements( _device, buffer, &memRequirements );
-
-   const VMemAlloc alloc =
-      _hostVisibleMemPool->alloc( memRequirements.size, memRequirements.alignment );
-
-   vkBindBufferMemory( _device, buffer, alloc.memory, alloc.offset );
-
-   return alloc;
-}
-
-void VulkanGraphic::createImage( uint32_t width,
-                                 uint32_t height,
-                                 VkFormat format,
-                                 VkImageTiling tiling,
-                                 VkImageUsageFlags usage,
-                                 VkMemoryPropertyFlags properties,
-                                 VDeleter<VkImage>& image,
-                                 VDeleter<VkDeviceMemory>& imageMemory )
-{
-   VkImageCreateInfo imageInfo = {};
-   imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-   imageInfo.imageType = VK_IMAGE_TYPE_2D;
-   imageInfo.extent.width = width;
-   imageInfo.extent.height = height;
-   imageInfo.extent.depth = 1;
-   imageInfo.mipLevels = 1;
-   imageInfo.arrayLayers = 1;
-   imageInfo.format = format;
-   imageInfo.tiling = tiling;
-   imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-   imageInfo.usage = usage;
-   imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-   imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-   imageInfo.flags = 0;  // Optional
-
-   VK_CALL( vkCreateImage( _device, &imageInfo, nullptr, &image ) );
-
-   VkMemoryRequirements memRequirements;
-   vkGetImageMemoryRequirements( _device, image, &memRequirements );
-
-   VkMemoryAllocateInfo allocInfo = {};
-   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-   allocInfo.allocationSize = memRequirements.size;
-   allocInfo.memoryTypeIndex =
-      findMemoryType( _physDevice, memRequirements.memoryTypeBits, properties );
-
-   VK_CALL( vkAllocateMemory( _device, &allocInfo, nullptr, &imageMemory ) );
-
-   VK_CALL( vkBindImageMemory( _device, image, imageMemory, 0 ) );
-}
-
 bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
 {
    const size_t bufferSize = sizeof( ( vertices[ 0 ] ) ) * vertices.size();
 
    VDeleter<VkBuffer> stagingBuffer{_device, vkDestroyBuffer};
    VDeleter<VkDeviceMemory> stagingBufferMemory{_device, vkFreeMemory};
-   VMemAlloc hostBuffer =
-      createHostBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, stagingBuffer );
+   VMemAlloc hostBuffer = createBuffer( _hostVisibleMemPool.get(), bufferSize,
+                                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, stagingBuffer );
    void* data;
    VK_CALL( vkMapMemory( _device, hostBuffer.memory, hostBuffer.offset, bufferSize, 0, &data ) );
    memcpy( data, vertices.data(), bufferSize );
    vkUnmapMemory( _device, hostBuffer.memory );
 
-   createDeviceBuffer(
-      bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-      _vertexBuffer );
+   createBuffer( _deviceLocalMemPool.get(), bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 _vertexBuffer );
 
    copyBuffer( stagingBuffer, _vertexBuffer, bufferSize, _device, _commandPool,
                _graphicQueue.handle );
 
    _verticesCount = static_cast<uint32_t>( vertices.size() );
+
+   // Free host memory
+   _hostVisibleMemPool->free( hostBuffer );
 
    return true;
 }
@@ -1102,21 +1018,24 @@ bool VulkanGraphic::createIndexBuffer( const std::vector<uint32_t>& indices )
    const size_t bufferSize = indices.size() * sizeof( uint32_t );
    VDeleter<VkBuffer> stagingBuffer{_device, vkDestroyBuffer};
    VDeleter<VkDeviceMemory> stagingBufferMemory{_device, vkFreeMemory};
-   VMemAlloc hostBuffer =
-      createHostBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, stagingBuffer );
+   VMemAlloc hostBuffer = createBuffer( _hostVisibleMemPool.get(), bufferSize,
+                                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, stagingBuffer );
    void* data;
    VK_CALL( vkMapMemory( _device, hostBuffer.memory, hostBuffer.offset, bufferSize, 0, &data ) );
    memcpy( data, indices.data(), bufferSize );
-   vkUnmapMemory( _device, hostBuffer.memory);
+   vkUnmapMemory( _device, hostBuffer.memory );
 
-   createDeviceBuffer( bufferSize,
-                       VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                       _indexBuffer );
+   createBuffer( _deviceLocalMemPool.get(), bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 _indexBuffer );
 
    copyBuffer( stagingBuffer, _indexBuffer, bufferSize, _device, _commandPool,
                _graphicQueue.handle );
 
    _indexCount = static_cast<uint32_t>( indices.size() );
+
+   // Free host memory
+   _hostVisibleMemPool->free( hostBuffer );
 
    return true;
 }
@@ -1126,10 +1045,11 @@ bool VulkanGraphic::createUniformBuffer()
    VkDeviceSize bufferSize = sizeof( UniformBufferObject );
 
    _uniformStagingBufferMemory =
-      createHostBuffer( bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, _uniformStagingBuffer );
-   createDeviceBuffer( bufferSize,
-                       VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                       _uniformBuffer );
+      createBuffer( _hostVisibleMemPool.get(), bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                    _uniformStagingBuffer );
+   createBuffer( _deviceLocalMemPool.get(), bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                 _uniformBuffer );
 
    return true;
 }
@@ -1142,21 +1062,21 @@ bool VulkanGraphic::createTextureImage()
 
    assert( pixels && "Error loading texture" );
 
-   createImage( width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR,
+   VMemAlloc hostAlloc = createImage( width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR,
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                _stagingImage, _stagingImageMemory );
+                _hostVisibleMemPool.get(),
+                _stagingImage );
 
    void* data;
-   vkMapMemory( _device, _stagingImageMemory, 0, size, 0, &data );
+   vkMapMemory( _device, *_hostVisibleMemPool.get(), 0, size, 0, &data );
    memcpy( data, pixels, (size_t)size );
-   vkUnmapMemory( _device, _stagingImageMemory );
+   vkUnmapMemory( _device, *_hostVisibleMemPool.get());
 
    stbi_image_free( pixels );
 
    createImage( width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _textureImage, _textureImageMemory );
+                _deviceLocalMemPool.get(), _textureImage );
 
    transitionImageLayout( _stagingImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED,
                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _device, _commandPool,
@@ -1169,6 +1089,9 @@ bool VulkanGraphic::createTextureImage()
    transitionImageLayout(
       _textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _device, _commandPool, _graphicQueue.handle );
+
+   // Free host memory
+   _hostVisibleMemPool->free(hostAlloc);
 
    return true;
 }
@@ -1209,7 +1132,7 @@ bool VulkanGraphic::createDepthImage()
 {
    createImage( _swapChain->_curExtent.width, _swapChain->_curExtent.height, VK_FORMAT_D32_SFLOAT,
                 VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _depthImage, _depthImageMemory );
+                _deviceLocalMemPool.get(), _depthImage );
    createImageView( _depthImage, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, _depthImageView,
                     _device );
 
