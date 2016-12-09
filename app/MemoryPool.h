@@ -109,7 +109,7 @@ class MemoryPool
       const bool mergeLeft = it != _allocatedChunks.begin() &&
                              ( it - 1 ) != _allocatedChunks.begin() && ( it - 1 )->isFree;
 
-      std::vector<AllocChunk>::iterator itToRemoves[ 2 ] = {it, it};
+      typename std::vector<AllocChunk>::iterator itToRemoves[ 2 ] = {it, it};
       if ( mergeRight )
       {
          const auto nextIt = it + 1;
