@@ -39,6 +39,10 @@ class VDeleter
 	   return &object;
    }
 
+   const T* get() const {
+	   return &object;
+   }
+
    const T* operator &() const {
 	   return &object;
    }

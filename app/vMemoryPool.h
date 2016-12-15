@@ -5,87 +5,55 @@
 #include "MemoryPool.h"
 #include <vulkan/vulkan.h>
 #include <inttypes.h>
+#include <memory>
 
-template <typename MEMORY>
-struct MemAlloc
+struct VMemAlloc
 {
-   MEMORY memory;
+   VkDeviceMemory memory;
    uint64_t offset;
 };
 
-using VMemAlloc = MemAlloc<VkDeviceMemory>;
-
-template <uint32_t SIZE, unsigned MAX_ALLOC = 200>
 class VMemoryPool
 {
   public:
-   VMemoryPool( const VkPhysicalDevice& physDevice,
+   VMemoryPool( uint64_t size,
+                const VkPhysicalDevice& physDevice,
                 const VDeleter<VkDevice>& device,
-                VkMemoryPropertyFlagBits type )
-       : _physDevice( physDevice ), _device( device )
-   {
-      vkGetPhysicalDeviceMemoryProperties( physDevice, &_memProperties );
-      VkMemoryAllocateInfo allocInfo = {};
-      allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-      allocInfo.allocationSize = SIZE;
-      allocInfo.memoryTypeIndex = findMemoryType( _memProperties, type );
+                uint32_t memTypeMask,
+                VkMemoryPropertyFlags type,
+                uint64_t maxAllocCount = 200 );
 
-      VK_CALL( vkAllocateMemory( _device, &allocInfo, nullptr, &_memory ) );
-   }
+   uint64_t alloc( uint64_t size, uint64_t alignment );
+   void free( VMemAlloc& mem );
+   operator VkDeviceMemory();
 
-   VMemAlloc alloc( uint64_t size, uint64_t alignment )
-   {
-      return VMemAlloc{*_memory.get(), _pool.alloc( size, alignment )};
-   }
-   void free( VMemAlloc& mem )
-   {
-      assert( mem.memory == *_memory.get() );
-      _pool.free( mem.offset );
-#ifdef DEBUG
-      mem.memory = nullptr;
-      mem.offset = -1;
-#endif  // DEBUG
-   }
-   operator VkDeviceMemory() { return *_memory.get(); }
   private:
-   uint32_t findMemoryType( VkPhysicalDeviceMemoryProperties memProperties,
-                            VkMemoryPropertyFlagBits propertiesFlag );
-
-   const VkPhysicalDevice& _physDevice;
    const VDeleter<VkDevice>& _device;
    VDeleter<VkDeviceMemory> _memory{_device, vkFreeMemory};
-   MemoryPool<SIZE, MAX_ALLOC> _pool;
+   MemoryPool _pool;
    VkPhysicalDeviceMemoryProperties _memProperties;
-   VkMemoryPropertyFlagBits _type;
+   VkMemoryPropertyFlags _type;
 };
 
-template <uint32_t SIZE, unsigned MAX_ALLOC>
-uint32_t VMemoryPool<SIZE, MAX_ALLOC>::findMemoryType(
-   VkPhysicalDeviceMemoryProperties memProperties,
-   VkMemoryPropertyFlagBits propertiesFlag )
+class VMemoryManager
 {
-   uint32_t index = VK_MAX_MEMORY_TYPES;
-   VkDeviceSize size = 0;
+  public:
+   VMemoryManager( const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& device );
+   VMemAlloc alloc( const VkMemoryRequirements& requirements,
+                    const VkMemoryPropertyFlags& properties );
+   void free( VMemAlloc& alloc );
 
-   for ( uint32_t i = 0; i < memProperties.memoryTypeCount; ++i )
+  private:
+   struct PoolProperties
    {
-      VkMemoryHeap& heap = memProperties.memoryHeaps[ memProperties.memoryTypes[ i ].heapIndex ];
-      if ( memProperties.memoryTypes[ i ].propertyFlags & propertiesFlag )
-      {
-         if ( heap.size > size )
-         {
-            size = heap.size;
-            index = i;
-         }
-      }
-   }
+      VkMemoryPropertyFlags memPropertyFlags;
+      uint32_t memoryTypeBits;
+   };
 
-   if ( size == 0 || index == VK_MAX_MEMORY_TYPES )
-   {
-      assert( !"Cannot get memory from device" );
-   }
-
-   return index;
-}
+   std::vector<std::unique_ptr<VMemoryPool> > _pools;
+   std::vector<PoolProperties> _poolsProperties;
+   const VkPhysicalDevice& _physDevice;
+   const VDeleter<VkDevice>& _device;
+};
 
 #endif  // VK_MEMORY_POOL_
