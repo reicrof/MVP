@@ -13,7 +13,6 @@ class MemoryPool
    static constexpr uint64_t INVALID_OFFSET = std::numeric_limits<uint64_t>::max();
 
    MemoryPool(uint64_t size, uint64_t maxAllocCount = 200);
-
    uint64_t alloc(uint64_t size, uint64_t alignment);
    void free(uint64_t offset);
 

@@ -10,6 +10,7 @@ coreInclude = ["../core/"]
 
 # Third parties includes
 #clang = "-stdlib=libc++"
+stdlib = ""
 glfwInclude = [ "../thirdParties/glfw/include/" ]
 glmInclude = [ "../thirdParties/" ]
 vulkanLibPath = ["../thirdParties/vulkan/"]
@@ -19,7 +20,7 @@ commonCompilerFlags = [ "-Wall", "-Werror", ]
 cppVersion = ["-std=c++1z"]
 
 if platform.system() == "Linux":
-   compiler = "/DLlocal/landrych/cfe-3.9.0.src/build/bin/clang++"
+   compiler = "/DLlocal/landrych/llvm-build/bin/clang++"
    compilerFlags = [ "-g"]
    glfwLibPath = ["../thirdParties/glfw/"]
    libs = ["-lglfw3", "-lvulkan-1"]
@@ -39,11 +40,11 @@ for opt, arg in opts:
    elif opt == '-s':
       cppVersion = ["-std="+str(arg)]
    elif opt == '-l':
-      stdlib = ["-stdlib"+str(arg)]
+      stdlib = ["-stdlib="+str(arg)]
 
 buildStartTime = datetime.datetime.now()
 print "Building on " + platform.system() + " with " + compiler + " at " + str(buildStartTime)
-result = subprocess.call( [ compiler ] + cppVersion + commonCompilerFlags + compilerFlags + srcFiles + ["-I"] + glfwInclude + ["-I"] + vulkanIncludePath + \
+result = subprocess.call( [ compiler ] + cppVersion + stdlib + commonCompilerFlags + compilerFlags + srcFiles + ["-I"] + glfwInclude + ["-I"] + vulkanIncludePath + \
                   ["-I"] + glmInclude + ["-I"] + stbIncludePath + ["-I"] + coreInclude + ["-L"] + glfwLibPath + ["-L"] + vulkanLibPath + libs + ["-o"] + [ outName ] )
 
 buildEndTime = datetime.datetime.now()
