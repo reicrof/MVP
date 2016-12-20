@@ -5,17 +5,18 @@ import getopt
 import datetime
 
 outName = "mvp"
-srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp", "MemoryPool.cpp", "vMemoryPool.cpp", "VImage.cpp" ]
+srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp", "MemoryPool.cpp", "vMemoryPool.cpp", "VImage.cpp", "vCommandPool.cpp"]
 coreInclude = ["../core/"]
 
 # Third parties includes
 #clang = "-stdlib=libc++"
-stdlib = ""
+stdlib = [""]
 glfwInclude = [ "../thirdParties/glfw/include/" ]
 glmInclude = [ "../thirdParties/" ]
 vulkanLibPath = ["../thirdParties/vulkan/"]
 vulkanIncludePath = ["../thirdParties/vulkan/include"]
 stbIncludePath = ["../thirdParties/stb"]
+tinyobjIncludePath = ["../thirdParties/tiny_obj_loader"]
 commonCompilerFlags = [ "-Wall", "-Werror", ]
 cppVersion = ["-std=c++1z"]
 

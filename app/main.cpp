@@ -165,8 +165,9 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createTextureSampler(), "Cannot create texture sampler" );
    VERIFY( VK.createDepthImage(), "Cannot create depth image." );
    VERIFY( VK.createFrameBuffers(), "Cannot create frame buffer." );
-   VERIFY( VK.createVertexBuffer( vertices ), "Cannot create vertex buffer." );
-   VERIFY( VK.createIndexBuffer( indices ), "Cannot create index buffer." );
+   VERIFY( VK.loadModel( "../models/armadillo.obj" ), "Cannot load model" );
+   // VERIFY( VK.createVertexBuffer( vertices ), "Cannot create vertex buffer." );
+   // VERIFY( VK.createIndexBuffer( indices ), "Cannot create index buffer." );
    VERIFY( VK.createUniformBuffer(), "Cannot create uniform buffer." );
    VERIFY( VK.createDescriptorPool(), "Cannot create descriptor pool." );
    VERIFY( VK.createDescriptorSet(), "Cannot create descriptor set." );
@@ -181,7 +182,7 @@ void updateUBO( UniformBufferObject& ubo, const SwapChain* swapChain )
    auto currentTime = std::chrono::high_resolution_clock::now();
    float time =
       std::chrono::duration_cast<std::chrono::milliseconds>( currentTime - startTime ).count() /
-      1000.0f;
+      10000.0f;
 
    ubo.model =
       glm::rotate( glm::mat4(), time * glm::radians( 90.0f ), glm::vec3( 0.0f, 0.0f, 1.0f ) );
@@ -190,6 +191,7 @@ void updateUBO( UniformBufferObject& ubo, const SwapChain* swapChain )
    ubo.proj = glm::perspective( glm::radians( 45.0f ),
                                 swapChain->_curExtent.width / (float)swapChain->_curExtent.height,
                                 0.1f, 10.0f );
+   ubo.proj[ 1 ][ 1 ] *= -1;
 }
 
 int main()

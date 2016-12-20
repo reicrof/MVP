@@ -16,14 +16,17 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
 const std::vector<const char*> VALIDATION_LAYERS = {"VK_LAYER_LUNARG_standard_validation"};
 
 const std::vector<const char*> DEVICE_EXTENSIONS = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-#ifdef NDEBUG
-const bool enableValidationLayers = false;
-#else
+#ifdef _DEBUG
 const bool enableValidationLayers = true;
+#else
+const bool enableValidationLayers = false;
 #endif
 
 VkResult CreateDebugReportCallbackEXT( VkInstance instance,
@@ -145,31 +148,10 @@ bool areDeviceExtensionsSupported( const VkPhysicalDevice& device,
    return success;
 }
 
-VkCommandBuffer beginSingleTimeCommands( VDeleter<VkDevice>& device,
-                                         VDeleter<VkCommandPool>& commandPool )
-{
-   VkCommandBufferAllocateInfo allocInfo = {};
-   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-   allocInfo.commandPool = commandPool;
-   allocInfo.commandBufferCount = 1;
-
-   VkCommandBuffer commandBuffer;
-   vkAllocateCommandBuffers( device, &allocInfo, &commandBuffer );
-
-   VkCommandBufferBeginInfo beginInfo = {};
-   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-   vkBeginCommandBuffer( commandBuffer, &beginInfo );
-
-   return commandBuffer;
-}
-
 void endSingleTimeCommands( VkCommandBuffer commandBuffer,
                             VDeleter<VkDevice>& device,
                             VkQueue& queue,
-                            VDeleter<VkCommandPool>& commandPool )
+                            VCommandPool& commandPool )
 {
    vkEndCommandBuffer( commandBuffer );
 
@@ -181,18 +163,35 @@ void endSingleTimeCommands( VkCommandBuffer commandBuffer,
    vkQueueSubmit( queue, 1, &submitInfo, VK_NULL_HANDLE );
    vkQueueWaitIdle( queue );
 
-   vkFreeCommandBuffers( device, commandPool, 1, &commandBuffer );
+   commandPool.free( commandBuffer );
+}
+
+void endSingleTimeCommands( VkCommandBuffer commandBuffer,
+                            VDeleter<VkDevice>& device,
+                            VkQueue& queue,
+                            VCommandPool& commandPool,
+                            VDeleter<VkFence>& fenceToSignal )
+{
+   vkEndCommandBuffer( commandBuffer );
+
+   VkSubmitInfo submitInfo = {};
+   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+   submitInfo.commandBufferCount = 1;
+   submitInfo.pCommandBuffers = &commandBuffer;
+
+   vkQueueSubmit( queue, 1, &submitInfo, fenceToSignal );
 }
 
 void copyBuffer( VkBuffer source,
                  VkBuffer dest,
                  VkDeviceSize size,
                  VDeleter<VkDevice>& device,
-                 VDeleter<VkCommandPool>& commandPool,
+                 VCommandPool& commandPool,
                  VkQueue& queue )
 {
    // Should probably use a pool for creating the command buffers
-   VkCommandBuffer commandBuffer = beginSingleTimeCommands( device, commandPool );
+   VkCommandBuffer commandBuffer =
+      *commandPool.alloc( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
 
    VkBufferCopy copyRegion = {};
    copyRegion.size = size;
@@ -201,15 +200,37 @@ void copyBuffer( VkBuffer source,
    endSingleTimeCommands( commandBuffer, device, queue, commandPool );
 }
 
+VkCommandBuffer* copyBuffer( VkBuffer source,
+                             VkBuffer dest,
+                             VkDeviceSize size,
+                             VDeleter<VkDevice>& device,
+                             VCommandPool& commandPool,
+                             VkQueue& queue,
+                             VDeleter<VkFence>& fence )
+{
+   // Should probably use a pool for creating the command buffers
+   VkCommandBuffer* commandBuffer =
+      commandPool.alloc( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
+
+   VkBufferCopy copyRegion = {};
+   copyRegion.size = size;
+   vkCmdCopyBuffer( *commandBuffer, source, dest, 1, &copyRegion );
+
+   endSingleTimeCommands( *commandBuffer, device, queue, commandPool, fence );
+
+   return commandBuffer;
+}
+
 void copyImage( VkImage srcImage,
                 VkImage dstImage,
                 uint32_t width,
                 uint32_t height,
                 VDeleter<VkDevice>& device,
-                VDeleter<VkCommandPool>& commandPool,
+                VCommandPool& commandPool,
                 VkQueue& queue )
 {
-   VkCommandBuffer commandBuffer = beginSingleTimeCommands( device, commandPool );
+   VkCommandBuffer commandBuffer =
+      *commandPool.alloc( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
 
    VkImageSubresourceLayers subResource = {};
    subResource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -260,10 +281,11 @@ void transitionImageLayout( VkImage image,
                             VkImageLayout oldLayout,
                             VkImageLayout newLayout,
                             VDeleter<VkDevice>& device,
-                            VDeleter<VkCommandPool>& commandPool,
+                            VCommandPool& commandPool,
                             VkQueue& queue )
 {
-   VkCommandBuffer commandBuffer = beginSingleTimeCommands( device, commandPool );
+   VkCommandBuffer commandBuffer =
+      *commandPool.alloc( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
 
    VkImageMemoryBarrier barrier = {};
    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -713,7 +735,7 @@ bool VulkanGraphic::createPipeline()
    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
    rasterizer.lineWidth = 1.0f;
    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-   rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+   rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
    rasterizer.depthBiasEnable = VK_FALSE;
 
    VkPipelineMultisampleStateCreateInfo multisampling = {};
@@ -814,6 +836,9 @@ bool VulkanGraphic::createCommandPool()
       0;  // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT or VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
 
    VK_CALL( vkCreateCommandPool( _device, &poolInfo, nullptr, &_commandPool ) );
+
+   _singleTimeCommandPool.init( VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+                                _graphicQueue.familyIndex );
 
    return true;
 }
@@ -941,7 +966,7 @@ void VulkanGraphic::createImage( uint32_t width,
    // Free the image memory if it was already allocated
    if ( image.isAllocated() )
    {
-	   _memoryManager.free(image.getMemory());
+      _memoryManager.free( image.getMemory() );
    }
 
    image.setMemory( _memoryManager.alloc( memRequirements, memProperty ) );
@@ -1031,6 +1056,12 @@ bool VulkanGraphic::createSemaphores()
    VkSemaphoreCreateInfo semaphoreInfo = {VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
    VK_CALL( vkCreateSemaphore( _device, &semaphoreInfo, nullptr, &_imageAvailableSemaphore ) );
    VK_CALL( vkCreateSemaphore( _device, &semaphoreInfo, nullptr, &_renderFinishedSemaphore ) );
+
+   VkFenceCreateInfo fenceCreateInfo = {};
+   fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+   fenceCreateInfo.flags = 0;
+   VK_CALL( vkCreateFence( _device, &fenceCreateInfo, nullptr, &_uboUpdatedFence ) );
+
    return true;
 }
 
@@ -1052,13 +1083,10 @@ bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                  _vertexBuffer );
 
-   copyBuffer( stagingBuffer, _vertexBuffer, bufferSize, _device, _commandPool,
+   copyBuffer( stagingBuffer, _vertexBuffer, bufferSize, _device, _singleTimeCommandPool,
                _graphicQueue.handle );
 
    _verticesCount = static_cast<uint32_t>( vertices.size() );
-
-   // Free host memory
-   //_hostVisibleMemPool->free( hostBuffer );
 
    return true;
 }
@@ -1080,13 +1108,10 @@ bool VulkanGraphic::createIndexBuffer( const std::vector<uint32_t>& indices )
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                  _indexBuffer );
 
-   copyBuffer( stagingBuffer, _indexBuffer, bufferSize, _device, _commandPool,
+   copyBuffer( stagingBuffer, _indexBuffer, bufferSize, _device, _singleTimeCommandPool,
                _graphicQueue.handle );
 
    _indexCount = static_cast<uint32_t>( indices.size() );
-
-   // Free host memory
-   //_hostVisibleMemPool->free( hostBuffer );
 
    return true;
 }
@@ -1108,7 +1133,8 @@ bool VulkanGraphic::createUniformBuffer()
 bool VulkanGraphic::createTextureImage()
 {
    int width, height, channels;
-   stbi_uc* pixels = stbi_load( "../textures/tex.jpg", &width, &height, &channels, STBI_rgb_alpha );
+   stbi_uc* pixels =
+      stbi_load( "../textures/chalet.jpg", &width, &height, &channels, STBI_rgb_alpha );
    VkDeviceSize size = width * height * 4;
 
    assert( pixels && "Error loading texture" );
@@ -1130,19 +1156,17 @@ bool VulkanGraphic::createTextureImage()
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _textureImage );
 
    transitionImageLayout( _stagingImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED,
-                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _device, _commandPool,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _device, _singleTimeCommandPool,
                           _graphicQueue.handle );
    transitionImageLayout( _textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _device, _commandPool,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _device, _singleTimeCommandPool,
                           _graphicQueue.handle );
-   copyImage( _stagingImage, _textureImage, width, height, _device, _commandPool,
+   copyImage( _stagingImage, _textureImage, width, height, _device, _singleTimeCommandPool,
               _graphicQueue.handle );
-   transitionImageLayout(
-      _textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _device, _commandPool, _graphicQueue.handle );
-
-   // Free host memory
-   //_hostVisibleMemPool->free(hostAlloc);
+   transitionImageLayout( _textureImage, VK_FORMAT_R8G8B8A8_UNORM,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _device, _singleTimeCommandPool,
+                          _graphicQueue.handle );
 
    return true;
 }
@@ -1188,10 +1212,57 @@ bool VulkanGraphic::createDepthImage()
                     _device );
 
    transitionImageLayout( _depthImage, VK_FORMAT_D32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, _device, _commandPool,
-                          _graphicQueue.handle );
+                          VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, _device,
+                          _singleTimeCommandPool, _graphicQueue.handle );
 
    return true;
+}
+
+bool VulkanGraphic::loadModel( const std::string& path )
+{
+   tinyobj::attrib_t attrib;
+   std::vector<tinyobj::shape_t> shapes;
+   std::vector<tinyobj::material_t> materials;
+   std::string err;
+
+   std::vector<Vertex> vertices;
+   std::vector<uint32_t> indices;
+   bool success = tinyobj::LoadObj( &attrib, &shapes, &materials, &err, path.c_str() );
+   if ( success )
+   {
+      vertices.reserve( attrib.vertices.size() / 3 );
+      indices.reserve( attrib.vertices.size() );
+      for ( const auto& shape : shapes )
+      {
+         for ( const auto& index : shape.mesh.indices )
+         {
+            Vertex vertex = {};
+            vertex.pos = {attrib.vertices[ 3 * index.vertex_index + 0 ],
+                          attrib.vertices[ 3 * index.vertex_index + 1 ],
+                          attrib.vertices[ 3 * index.vertex_index + 2 ]};
+            vertex.normal = {attrib.normals[ 3 * index.vertex_index + 0 ],
+                             attrib.normals[ 3 * index.vertex_index + 1 ],
+                             attrib.normals[ 3 * index.vertex_index + 2 ]};
+
+            if ( attrib.texcoords.size() > 0 )
+            {
+               vertex.texCoord = {attrib.texcoords[ 2 * index.texcoord_index + 0 ],
+                                  1.0f - attrib.texcoords[ 2 * index.texcoord_index + 1 ]};
+            }
+
+            vertices.push_back( vertex );
+            indices.push_back( (uint32_t)indices.size() );
+         }
+      }
+      createVertexBuffer( vertices );
+      createIndexBuffer( indices );
+   }
+   else
+   {
+      std::cerr << err << std::endl;
+   }
+
+   return success;
 }
 
 void VulkanGraphic::updateUBO( const UniformBufferObject& ubo )
@@ -1202,8 +1273,8 @@ void VulkanGraphic::updateUBO( const UniformBufferObject& ubo )
    memcpy( data, &ubo, sizeof( ubo ) );
    vkUnmapMemory( _device, _uniformStagingBufferMemory.memory );
 
-   copyBuffer( _uniformStagingBuffer, _uniformBuffer, sizeof( ubo ), _device, _commandPool,
-               _graphicQueue.handle );
+   _uboUpdateCmdBuf = copyBuffer( _uniformStagingBuffer, _uniformBuffer, sizeof( ubo ), _device,
+                                  _singleTimeCommandPool, _graphicQueue.handle, _uboUpdatedFence );
 }
 
 void VulkanGraphic::render()
@@ -1229,6 +1300,11 @@ void VulkanGraphic::render()
    VkSemaphore renderingFinisehdSemaphore[] = {_renderFinishedSemaphore};
    submitInfo.signalSemaphoreCount = 1;
    submitInfo.pSignalSemaphores = renderingFinisehdSemaphore;
+
+   // Wait for ubo udpate
+   VK_CALL( vkWaitForFences( _device, 1, _uboUpdatedFence.get(), VK_FALSE, 1000000000 ) );
+   vkResetFences( _device, 1, _uboUpdatedFence.get() );
+   _singleTimeCommandPool.free( *_uboUpdateCmdBuf );
 
    VK_CALL( vkQueueSubmit( _graphicQueue.handle, 1, &submitInfo, VK_NULL_HANDLE ) );
 

@@ -93,7 +93,7 @@ VMemAlloc VMemoryManager::alloc( const VkMemoryRequirements& requirements,
 
    // No pool meets the requirement. Lets create one.
    _poolsProperties.push_back( PoolProperties{properties, requirements.memoryTypeBits} );
-   _pools.push_back( std::make_unique<VMemoryPool>( requirements.size * 10, _physDevice, _device,
+   _pools.push_back( std::make_unique<VMemoryPool>( requirements.size * 4, _physDevice, _device,
                                                     requirements.memoryTypeBits, properties ) );
 
    return VMemAlloc{*_pools.back(),

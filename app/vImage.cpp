@@ -1,4 +1,4 @@
-#include "VImage.h"
+#include "vImage.h"
 
 VImage::VImage( VDeleter<VkDevice>& device ) : _image( device, vkDestroyImage ), _memAlloc()
 {

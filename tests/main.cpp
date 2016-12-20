@@ -1,4 +1,5 @@
 #include <app/MemoryPool.h>
+#include <app/ThreadPool.h>
 #include <memory>
 #include <inttypes.h>
 #include <assert.h>
@@ -142,6 +143,20 @@ bool memoryExactFit()
 	return pool._debugIsConform();
 }
 
+bool threadPoolTest()
+{
+	ThreadPool pool(std::thread::hardware_concurrency());
+	for (int i = 0; i < 100; ++i)
+	{
+		pool.addJob([]() {
+			std::this_thread::sleep_for(std::chrono::microseconds(300));
+			std::cout << "thread done" << std::endl;
+		});
+	}
+
+	return true;
+}
+
 template<typename FUNC>
 bool Test(FUNC f, const char* fctName)
 {
@@ -173,6 +188,7 @@ int main()
 		success &= TEST(memoryRandomAllocsRandomAlign);
 		success &= TEST(memoryRandomAllocsRandomAlignRandomFree);
 		success &= TEST(memoryExactFit);
+		success &= TEST(threadPoolTest);
 	}
 
 	if (success)

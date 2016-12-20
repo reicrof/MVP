@@ -7,6 +7,7 @@
 #include "vkUtils.h"
 #include "vMemoryPool.h"
 #include "vImage.h"
+#include "vCommandPool.h"
 #include <fstream>
 #include <memory>
 #include <vector>
@@ -52,6 +53,7 @@ class VulkanGraphic
    bool createTextureImageView();
    bool createTextureSampler();
    bool createDepthImage();
+   bool loadModel(const std::string& path);
    void updateUBO( const UniformBufferObject& ubo );
 
    void render();
@@ -95,6 +97,7 @@ class VulkanGraphic
    VDeleter<VkPipeline> _graphicsPipeline{_device, vkDestroyPipeline};
    std::vector<VDeleter<VkFramebuffer>> _framebuffers;
    VDeleter<VkCommandPool> _commandPool{_device, vkDestroyCommandPool};
+   VCommandPool _singleTimeCommandPool{ _device, 100 };
    std::vector<VkCommandBuffer> _commandBuffers;
    VDeleter<VkDescriptorPool> _descriptorPool{_device, vkDestroyDescriptorPool};
    VkDescriptorSet _descriptorSet;
@@ -102,14 +105,13 @@ class VulkanGraphic
    VDeleter<VkSemaphore> _imageAvailableSemaphore{_device, vkDestroySemaphore};
    VDeleter<VkSemaphore> _renderFinishedSemaphore{_device, vkDestroySemaphore};
 
+   VDeleter<VkFence> _uboUpdatedFence{ _device, vkDestroyFence };
+   VkCommandBuffer* _uboUpdateCmdBuf;
+
    VDeleter<VkBuffer> _vertexBuffer{_device, vkDestroyBuffer};
    VDeleter<VkBuffer> _indexBuffer{_device, vkDestroyBuffer};
 
    VMemoryManager _memoryManager{_physDevice, _device};
-   // static constexpr size_t DEVICE_LOCAL_MEMPOOL_SIZE = megabytes(512);
-   // static constexpr size_t HOST_VISIBLE_MEMPOOL_SIZE = megabytes(512);
-   // std::unique_ptr<VMemoryPool> _deviceLocalMemPool;
-   // std::unique_ptr<VMemoryPool> _hostVisibleMemPool;
    uint32_t _verticesCount;
    uint32_t _indexCount;
 
@@ -124,7 +126,6 @@ class VulkanGraphic
    VDeleter<VkImageView> _textureImageView{_device, vkDestroyImageView};
    VDeleter<VkSampler> _textureSampler{_device, vkDestroySampler};
 
-   // VDeleter<VkImage> _depthImage{_device, vkDestroyImage};
    VImage _depthImage{_device};
    VDeleter<VkDeviceMemory> _depthImageMemory{_device, vkFreeMemory};
    VDeleter<VkImageView> _depthImageView{_device, vkDestroyImageView};
