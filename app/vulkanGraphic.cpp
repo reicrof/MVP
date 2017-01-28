@@ -16,9 +16,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 const std::vector<const char*> VALIDATION_LAYERS = {"VK_LAYER_LUNARG_standard_validation"};
 
 const std::vector<const char*> DEVICE_EXTENSIONS = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
@@ -1036,12 +1033,14 @@ bool VulkanGraphic::createCommandBuffers()
       vkCmdBindDescriptorSets( _commandBuffers[ i ], VK_PIPELINE_BIND_POINT_GRAPHICS,
                                _pipelineLayout, 0, 1, &_descriptorSet, 0, nullptr );
 
-      VkBuffer vertexBuffers[] = {_vertexBuffer};
-      VkDeviceSize offsets[] = {0};
-      vkCmdBindVertexBuffers( _commandBuffers[ i ], 0, 1, vertexBuffers, offsets );
-      vkCmdBindIndexBuffer( _commandBuffers[ i ], _indexBuffer, 0, VK_INDEX_TYPE_UINT32 );
-
-      vkCmdDrawIndexed( _commandBuffers[ i ], _indexCount, 1, 0, 0, 0 );
+      if (_verticesCount > 0 )
+      {
+         VkBuffer vertexBuffers[] = {_vertexBuffer};
+         VkDeviceSize offsets[] = {0};
+         vkCmdBindVertexBuffers( _commandBuffers[ i ], 0, 1, vertexBuffers, offsets );
+         vkCmdBindIndexBuffer( _commandBuffers[ i ], _indexBuffer, 0, VK_INDEX_TYPE_UINT32 );
+		 vkCmdDrawIndexed(_commandBuffers[i], _indexCount, 1, 0, 0, 0);
+      }
 
       vkCmdEndRenderPass( _commandBuffers[ i ] );
 
@@ -1216,53 +1215,6 @@ bool VulkanGraphic::createDepthImage()
                           _singleTimeCommandPool, _graphicQueue.handle );
 
    return true;
-}
-
-bool VulkanGraphic::loadModel( const std::string& path )
-{
-   tinyobj::attrib_t attrib;
-   std::vector<tinyobj::shape_t> shapes;
-   std::vector<tinyobj::material_t> materials;
-   std::string err;
-
-   std::vector<Vertex> vertices;
-   std::vector<uint32_t> indices;
-   bool success = tinyobj::LoadObj( &attrib, &shapes, &materials, &err, path.c_str() );
-   if ( success )
-   {
-      vertices.reserve( attrib.vertices.size() / 3 );
-      indices.reserve( attrib.vertices.size() );
-      for ( const auto& shape : shapes )
-      {
-         for ( const auto& index : shape.mesh.indices )
-         {
-            Vertex vertex = {};
-            vertex.pos = {attrib.vertices[ 3 * index.vertex_index + 0 ],
-                          attrib.vertices[ 3 * index.vertex_index + 1 ],
-                          attrib.vertices[ 3 * index.vertex_index + 2 ]};
-            vertex.normal = {attrib.normals[ 3 * index.vertex_index + 0 ],
-                             attrib.normals[ 3 * index.vertex_index + 1 ],
-                             attrib.normals[ 3 * index.vertex_index + 2 ]};
-
-            if ( attrib.texcoords.size() > 0 )
-            {
-               vertex.texCoord = {attrib.texcoords[ 2 * index.texcoord_index + 0 ],
-                                  1.0f - attrib.texcoords[ 2 * index.texcoord_index + 1 ]};
-            }
-
-            vertices.push_back( vertex );
-            indices.push_back( (uint32_t)indices.size() );
-         }
-      }
-      createVertexBuffer( vertices );
-      createIndexBuffer( indices );
-   }
-   else
-   {
-      std::cerr << err << std::endl;
-   }
-
-   return success;
 }
 
 void VulkanGraphic::updateUBO( const UniformBufferObject& ubo )

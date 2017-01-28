@@ -146,11 +146,13 @@ bool memoryExactFit()
 bool threadPoolTest()
 {
 	ThreadPool pool(std::thread::hardware_concurrency());
+	std::vector< std::future<bool> > res(100);
 	for (int i = 0; i < 100; ++i)
 	{
-		pool.addJob([]() {
+		res[i] = pool.addJob([]() {
 			std::this_thread::sleep_for(std::chrono::microseconds(300));
 			std::cout << "thread done" << std::endl;
+			return true;
 		});
 	}
 

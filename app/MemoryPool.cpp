@@ -23,7 +23,7 @@ uint64_t MemoryPool::alloc(uint64_t size, uint64_t alignment)
 			chunk.size >=
 			(alignment - ((chunk.offset & alignmentMask)) & alignmentMask) + size;
 	});
-	assert(it != endIt);
+	assert(it != endIt); // Probably out of free space...
 	const uint64_t alignmentPadding =
 		(alignment - (it->offset & alignmentMask)) & alignmentMask;
 

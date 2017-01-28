@@ -5,7 +5,7 @@ import getopt
 import datetime
 
 outName = "mvp"
-srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp", "MemoryPool.cpp", "vMemoryPool.cpp", "VImage.cpp", "vCommandPool.cpp"]
+srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp", "MemoryPool.cpp", "vMemoryPool.cpp", "VImage.cpp", "vCommandPool.cpp", "Camera.cpp"]
 coreInclude = ["../core/"]
 
 # Third parties includes
@@ -46,7 +46,7 @@ for opt, arg in opts:
 buildStartTime = datetime.datetime.now()
 print "Building on " + platform.system() + " with " + compiler + " at " + str(buildStartTime)
 result = subprocess.call( [ compiler ] + cppVersion + stdlib + commonCompilerFlags + compilerFlags + srcFiles + ["-I"] + glfwInclude + ["-I"] + vulkanIncludePath + \
-                  ["-I"] + glmInclude + ["-I"] + stbIncludePath + ["-I"] + coreInclude + ["-L"] + glfwLibPath + ["-L"] + vulkanLibPath + libs + ["-o"] + [ outName ] )
+                  ["-I"] + glmInclude + ["-I"] + stbIncludePath + ["-I"] + tinyobjIncludePath +  ["-I"] + coreInclude + ["-L"] + glfwLibPath + ["-L"] + vulkanLibPath + libs + ["-o"] + [ outName ] )
 
 buildEndTime = datetime.datetime.now()
 if result != 0:

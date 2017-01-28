@@ -8,6 +8,9 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <future>
+#include <memory>
+#include <utility>
 #include <assert.h>
 
 class ThreadPool
@@ -17,7 +20,7 @@ class ThreadPool
 
 #include "ThreadPool.h"
 
-   ThreadPool::ThreadPool( int threadCount ) : _stopped( false )
+   ThreadPool( int threadCount ) : _stopped( false )
    {
       _threads.reserve( threadCount );
       for ( int i = 0; i < threadCount; ++i )
@@ -48,23 +51,29 @@ class ThreadPool
       }
    }
 
-   void ThreadPool::addJob( Job&& job )
+   template <class F, class... Args>
+   auto addJob( F&& f, Args&&... args )
    {
-	   assert(!_stopped);
+      auto jobTask =
+           std::make_shared< std::packaged_task<typename std::result_of<F( Args... )>::type()> >(
+            std::bind( std::forward<F>( f ), std::forward<Args>( args )... ) );
+      assert( !_stopped );
+      auto futureRes = jobTask->get_future();
       {
          std::unique_lock<std::mutex> lock( _jobsMutex );
-         _jobs.push( job );
+         _jobs.emplace( [jobTask]() { ( *jobTask )(); } );
       }
       _condition.notify_one();
+      return futureRes;
    }
 
-   void ThreadPool::stop()
+   void stop()
    {
       _stopped = true;
       _condition.notify_all();
    }
 
-   ThreadPool::~ThreadPool()
+   ~ThreadPool()
    {
       stop();
       for ( auto& t : _threads )

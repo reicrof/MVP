@@ -9,6 +9,7 @@
 
 #include "utils.h"
 #include "vulkanGraphic.h"
+#include "Camera.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -149,6 +150,63 @@ const std::vector<Vertex> vertices = {{{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f},
                                       {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
 const std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
+static bool loadModelImp( const std::string& path,
+                          std::vector<Vertex>* vertices,
+                          std::vector<uint32_t>* indices )
+{
+   tinyobj::attrib_t attrib;
+   std::vector<tinyobj::shape_t> shapes;
+   std::vector<tinyobj::material_t> materials;
+   std::string err;
+
+   bool success = tinyobj::LoadObj( &attrib, &shapes, &materials, &err, "../models/armadillo.obj" );
+   if ( success )
+   {
+      vertices->reserve( attrib.vertices.size() / 3 );
+      indices->reserve( attrib.vertices.size() );
+      for ( const auto& shape : shapes )
+      {
+         for ( const auto& index : shape.mesh.indices )
+         {
+            Vertex vertex = {};
+            vertex.pos = {attrib.vertices[ 3 * index.vertex_index + 0 ],
+                          attrib.vertices[ 3 * index.vertex_index + 1 ],
+                          attrib.vertices[ 3 * index.vertex_index + 2 ]};
+            vertex.normal = {attrib.normals[ 3 * index.vertex_index + 0 ],
+                             attrib.normals[ 3 * index.vertex_index + 1 ],
+                             attrib.normals[ 3 * index.vertex_index + 2 ]};
+
+            if ( attrib.texcoords.size() > 0 )
+            {
+               vertex.texCoord = {attrib.texcoords[ 2 * index.texcoord_index + 0 ],
+                                  1.0f - attrib.texcoords[ 2 * index.texcoord_index + 1 ]};
+            }
+
+            vertices->push_back( vertex );
+            indices->push_back( (uint32_t)indices->size() );
+         }
+      }
+      return true;
+   }
+   else
+   {
+      std::cerr << err << std::endl;
+   }
+   return false;
+}
+
+#include "ThreadPool.h"
+static auto loadModel( ThreadPool& jobPool,
+                       const std::string& path,
+                       std::vector<Vertex>* vertices,
+                       std::vector<uint32_t>* indices )
+{
+   return jobPool.addJob( loadModelImp, path, vertices, indices );
+}
+
 static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
 {
    VERIFY( VK.createSurface( window ), "Cannot create vulkan surface." );
@@ -165,9 +223,6 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createTextureSampler(), "Cannot create texture sampler" );
    VERIFY( VK.createDepthImage(), "Cannot create depth image." );
    VERIFY( VK.createFrameBuffers(), "Cannot create frame buffer." );
-   VERIFY( VK.loadModel( "../models/armadillo.obj" ), "Cannot load model" );
-   // VERIFY( VK.createVertexBuffer( vertices ), "Cannot create vertex buffer." );
-   // VERIFY( VK.createIndexBuffer( indices ), "Cannot create index buffer." );
    VERIFY( VK.createUniformBuffer(), "Cannot create uniform buffer." );
    VERIFY( VK.createDescriptorPool(), "Cannot create descriptor pool." );
    VERIFY( VK.createDescriptorSet(), "Cannot create descriptor set." );
@@ -175,7 +230,7 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createSemaphores(), "Cannot create semaphores." );
 }
 
-void updateUBO( UniformBufferObject& ubo, const SwapChain* swapChain )
+void updateUBO( const Camera& cam, UniformBufferObject& ubo )
 {
    static auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -185,14 +240,52 @@ void updateUBO( UniformBufferObject& ubo, const SwapChain* swapChain )
       10000.0f;
 
    ubo.model =
-      glm::rotate( glm::mat4(), time * glm::radians( 90.0f ), glm::vec3( 0.0f, 0.0f, 1.0f ) );
-   ubo.view = glm::lookAt( glm::vec3( 2.0f, 2.0f, 2.0f ), glm::vec3( 0.0f, 0.0f, 0.0f ),
-                           glm::vec3( 0.0f, 0.0f, 1.0f ) );
-   ubo.proj = glm::perspective( glm::radians( 45.0f ),
-                                swapChain->_curExtent.width / (float)swapChain->_curExtent.height,
-                                0.1f, 10.0f );
-   ubo.proj[ 1 ][ 1 ] *= -1;
+      glm::rotate( glm::mat4(), time * glm::radians( 90.0f ), glm::vec3( 0.0f, 1.0f, 0.0f ) );
+
+   ubo.view = cam.getView();
+   ubo.proj = cam.getProj();
 }
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include "glm/gtx/euler_angles.hpp"
+Camera cam( 45.0f, 1920, 1080, 0.1f, 20 );
+void onMousePos( GLFWwindow* window, double x, double y )
+{
+   static bool isPressed = false;
+   static double onPressX = 0;
+   static double onPressY = 0;
+   static glm::quat startOri;
+   if ( glfwGetMouseButton( window, GLFW_MOUSE_BUTTON_1 ) == GLFW_PRESS )
+   {
+      if ( isPressed == false )
+      {
+         isPressed = true;
+         onPressX = x;
+         onPressY = y;
+         startOri = cam.getOrientation();
+      }
+
+      float deltaX = (float)( x - onPressX );
+      float deltaY = (float)( y - onPressY );
+
+      float xRatio = deltaX / (float)cam.getWidth();
+      float yRatio = deltaY / (float)cam.getHeight();
+      float rotX = ( glm::radians( 360.0f ) ) * yRatio;
+      float rotY = ( glm::radians( 360.0f ) ) * xRatio;
+
+      const glm::quat matRotX = glm::rotate( glm::quat(), rotX, glm::vec3( 1.0f, 0.0f, 0.0f ) );
+      const glm::quat appliedRot = glm::rotate( matRotX, rotY, glm::vec3( 0.0f, 1.0f, 0.0f ) );
+      const glm::quat finalOri = appliedRot * startOri;
+
+      cam.setOrientation( finalOri );
+      cam.setPos( ( cam.getForward() * 8.0f ) * finalOri );
+   }
+   else
+   {
+      isPressed = false;
+   }
+}
+
 
 int main()
 {
@@ -200,6 +293,12 @@ int main()
    VERIFY( glfwVulkanSupported(), "Vulkan not supported." );
 
    loadCoreFunctions();
+
+   ThreadPool threadPool( std::thread::hardware_concurrency() );
+
+   std::vector<Vertex> vertices;
+   std::vector<uint32_t> indices;
+   auto done = loadModel( threadPool, "../models/armadillo.obj", &vertices, &indices );
 
    glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
    GLFWwindow* window = glfwCreateWindow( 800, 600, "MVP", nullptr, nullptr );
@@ -219,6 +318,7 @@ int main()
    glfwSetKeyCallback( window, keyCB );
    glfwSetWindowUserPointer( window, &VK );  // Set user data
    glfwSetWindowSizeCallback( window, onWindowResized );
+   glfwSetCursorPosCallback( window, onMousePos );
 
    UniformBufferObject ubo = {};
 
@@ -227,11 +327,20 @@ int main()
    auto nextFpsPrintTime = 1s;
    unsigned frameRendered = 0;
 
+   cam.setExtent( VK.getSwapChain()->_curExtent.width, VK.getSwapChain()->_curExtent.height );
+   bool modelLoaded = false;
    while ( !glfwWindowShouldClose( window ) )
    {
+      if ( !modelLoaded && done.wait_for( std::chrono::seconds( 0 ) ) == std::future_status::ready )
+      {
+         VK.createVertexBuffer( vertices );
+         VK.createIndexBuffer( indices );
+         VK.recreateSwapChain();
+         modelLoaded = true;
+      }
       updateCoreDll();
       glfwPollEvents();
-      updateUBO( ubo, VK.getSwapChain() );
+      updateUBO( cam, ubo );
       VK.updateUBO( ubo );
       // std::cout << ptr() << std::endl;
       VK.render();

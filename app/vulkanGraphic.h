@@ -53,7 +53,7 @@ class VulkanGraphic
    bool createTextureImageView();
    bool createTextureSampler();
    bool createDepthImage();
-   bool loadModel(const std::string& path);
+   // bool loadModel(const std::string& path);
    void updateUBO( const UniformBufferObject& ubo );
 
    void render();
@@ -97,7 +97,7 @@ class VulkanGraphic
    VDeleter<VkPipeline> _graphicsPipeline{_device, vkDestroyPipeline};
    std::vector<VDeleter<VkFramebuffer>> _framebuffers;
    VDeleter<VkCommandPool> _commandPool{_device, vkDestroyCommandPool};
-   VCommandPool _singleTimeCommandPool{ _device, 100 };
+   VCommandPool _singleTimeCommandPool{_device, 100};
    std::vector<VkCommandBuffer> _commandBuffers;
    VDeleter<VkDescriptorPool> _descriptorPool{_device, vkDestroyDescriptorPool};
    VkDescriptorSet _descriptorSet;
@@ -105,7 +105,7 @@ class VulkanGraphic
    VDeleter<VkSemaphore> _imageAvailableSemaphore{_device, vkDestroySemaphore};
    VDeleter<VkSemaphore> _renderFinishedSemaphore{_device, vkDestroySemaphore};
 
-   VDeleter<VkFence> _uboUpdatedFence{ _device, vkDestroyFence };
+   VDeleter<VkFence> _uboUpdatedFence{_device, vkDestroyFence};
    VkCommandBuffer* _uboUpdateCmdBuf;
 
    VDeleter<VkBuffer> _vertexBuffer{_device, vkDestroyBuffer};
