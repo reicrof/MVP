@@ -42,8 +42,14 @@ void Camera::setOrientation( const quat& ori )
 
 vec3 Camera::getForward() const
 {
-   static const vec3 FORWARD( 0.0f, 0.0f, -1.0f );
+   static const vec3 FORWARD( 0.0f, 0.0f, 1.0f );
    return _orientation * FORWARD;
+}
+
+vec3 Camera::getRight() const
+{
+   static const vec3 RIGHT( 1.0f, 0.0f, 0.0f );
+   return _orientation * RIGHT;
 }
 
 const mat4& Camera::getView() const
@@ -77,5 +83,5 @@ const unsigned Camera::getHeight() const
 
 void Camera::updateViewMatrix()
 {
-	_view = translate(glm::mat4(), _position) * toMat4(_orientation);
+   _view = translate( toMat4( glm::conjugate( _orientation ) ), -1.0f * _position );
 }

@@ -113,14 +113,6 @@ bool shouldReloadCoreLib()
 #endif
 }
 
-static void keyCB( GLFWwindow* window, int key, int scancode, int action, int mods )
-{
-   if ( key == GLFW_KEY_ESCAPE && action == GLFW_PRESS )
-   {
-      glfwSetWindowShouldClose( window, GLFW_TRUE );
-   }
-}
-
 static void onWindowResized( GLFWwindow* window, int width, int height )
 {
    if ( width > 0 && height > 0 )
@@ -240,7 +232,7 @@ void updateUBO( const Camera& cam, UniformBufferObject& ubo )
       10000.0f;
 
    ubo.model =
-      glm::rotate( glm::mat4(), time * glm::radians( 90.0f ), glm::vec3( 0.0f, 1.0f, 0.0f ) );
+      glm::rotate( glm::mat4(), /*time **/ glm::radians( 90.0f ), glm::vec3( 0.0f, 1.0f, 0.0f ) );
 
    ubo.view = cam.getView();
    ubo.proj = cam.getProj();
@@ -251,38 +243,115 @@ void updateUBO( const Camera& cam, UniformBufferObject& ubo )
 Camera cam( 45.0f, 1920, 1080, 0.1f, 20 );
 void onMousePos( GLFWwindow* window, double x, double y )
 {
-   static bool isPressed = false;
-   static double onPressX = 0;
-   static double onPressY = 0;
-   static glm::quat startOri;
-   if ( glfwGetMouseButton( window, GLFW_MOUSE_BUTTON_1 ) == GLFW_PRESS )
+   const double PI = 3.1415926535897;
+   static const double X_SENSITIVITY = 0.002;
+   static const double Y_SENSITIVITY = 0.002;
+
+   static glm::vec2 startPos( y * Y_SENSITIVITY, x * X_SENSITIVITY );
+   static bool shouldResetStartPos = false;
+   if ( glfwGetInputMode( window, GLFW_CURSOR ) == GLFW_CURSOR_NORMAL )
    {
-      if ( isPressed == false )
-      {
-         isPressed = true;
-         onPressX = x;
-         onPressY = y;
-         startOri = cam.getOrientation();
-      }
-
-      float deltaX = (float)( x - onPressX );
-      float deltaY = (float)( y - onPressY );
-
-      float xRatio = deltaX / (float)cam.getWidth();
-      float yRatio = deltaY / (float)cam.getHeight();
-      float rotX = ( glm::radians( 360.0f ) ) * yRatio;
-      float rotY = ( glm::radians( 360.0f ) ) * xRatio;
-
-      const glm::quat matRotX = glm::rotate( glm::quat(), rotX, glm::vec3( 1.0f, 0.0f, 0.0f ) );
-      const glm::quat appliedRot = glm::rotate( matRotX, rotY, glm::vec3( 0.0f, 1.0f, 0.0f ) );
-      const glm::quat finalOri = appliedRot * startOri;
-
-      cam.setOrientation( finalOri );
-      cam.setPos( ( cam.getForward() * 8.0f ) * finalOri );
+      shouldResetStartPos = true;
+      return;
    }
-   else
+
+   if ( shouldResetStartPos )
    {
-      isPressed = false;
+      glm::vec3 valueOnExit = glm::eulerAngles( cam.getOrientation() );
+      startPos = glm::vec2( valueOnExit.x, valueOnExit.y ) +
+                 glm::vec2( ( y * Y_SENSITIVITY ), x * X_SENSITIVITY );
+      shouldResetStartPos = false;
+   }
+
+   const double yVal = std::clamp( y * Y_SENSITIVITY, -PI / 2.0, PI / 2.0 );
+   const glm::quat rot = glm::normalize(
+      glm::quat( glm::vec3( startPos - glm::vec2( yVal, x * X_SENSITIVITY ), 0.0 ) ) );
+
+   cam.setOrientation( rot );
+}
+
+namespace KeyAction
+{
+enum Action
+{
+   UNDEF_ACTION,
+
+   // Movement stuff
+   MOVE_FORWARD,
+   MOVE_BACKWARD,
+   STRAFE_LEFT,
+   STRAFE_RIGHT,
+
+   // Menu stuff
+   EXIT,
+   TOGGLE_MOUSE_CAPTURE,
+
+   LAST_KEY_ACTION
+};
+}
+
+static std::array<int, GLFW_KEY_LAST> actionKeyStates = {};
+static std::array<KeyAction::Action, GLFW_KEY_LAST> glfwKeyToAction = {};
+
+static void keyboardActionInit()
+{
+   glfwKeyToAction[ GLFW_KEY_W ] = KeyAction::MOVE_FORWARD;
+   glfwKeyToAction[ GLFW_KEY_S ] = KeyAction::MOVE_BACKWARD;
+   glfwKeyToAction[ GLFW_KEY_A ] = KeyAction::STRAFE_LEFT;
+   glfwKeyToAction[ GLFW_KEY_D ] = KeyAction::STRAFE_RIGHT;
+   glfwKeyToAction[ GLFW_KEY_ESCAPE ] = KeyAction::EXIT;
+   glfwKeyToAction[ GLFW_KEY_SPACE ] = KeyAction::TOGGLE_MOUSE_CAPTURE;
+
+   actionKeyStates[ KeyAction::MOVE_FORWARD ] = GLFW_RELEASE;
+   actionKeyStates[ KeyAction::MOVE_BACKWARD ] = GLFW_RELEASE;
+   actionKeyStates[ KeyAction::STRAFE_LEFT ] = GLFW_RELEASE;
+   actionKeyStates[ KeyAction::STRAFE_RIGHT ] = GLFW_RELEASE;
+   actionKeyStates[ KeyAction::EXIT ] = GLFW_RELEASE;
+   actionKeyStates[ KeyAction::TOGGLE_MOUSE_CAPTURE ] = GLFW_RELEASE;
+}
+
+static void keyCB( GLFWwindow* window, int key, int scancode, int action, int mods )
+{
+   actionKeyStates[ glfwKeyToAction[ key ] ] = action;
+}
+
+#include <glm/gtx/string_cast.hpp>
+static void pollKeyboard( GLFWwindow* window )
+{
+   if ( actionKeyStates[ KeyAction::MOVE_FORWARD ] > 0 )
+   {
+      actionKeyStates[ KeyAction::MOVE_FORWARD ] = GLFW_REPEAT;
+      cam.setPos( cam.getPos() - cam.getForward() * 0.01f );
+   }
+   else if ( actionKeyStates[ KeyAction::MOVE_BACKWARD ] > 0 )
+   {
+      actionKeyStates[ KeyAction::MOVE_BACKWARD ] = GLFW_REPEAT;
+      cam.setPos( cam.getPos() + cam.getForward() * 0.01f );
+   }
+
+   if ( actionKeyStates[ KeyAction::STRAFE_LEFT ] > 0 )
+   {
+      actionKeyStates[ KeyAction::STRAFE_LEFT ] = GLFW_REPEAT;
+      cam.setPos( cam.getPos() - cam.getRight() * 0.01f );
+   }
+   else if ( actionKeyStates[ KeyAction::STRAFE_RIGHT ] > 0 )
+   {
+      actionKeyStates[ KeyAction::STRAFE_RIGHT ] = GLFW_REPEAT;
+      cam.setPos( cam.getPos() + cam.getRight() * 0.01f );
+   }
+
+   if ( actionKeyStates[ KeyAction::EXIT ] == GLFW_PRESS )
+   {
+      glfwSetWindowShouldClose( window, GLFW_TRUE );
+      actionKeyStates[ KeyAction::EXIT ] = GLFW_REPEAT;
+   }
+
+   if ( actionKeyStates[ KeyAction::TOGGLE_MOUSE_CAPTURE ] == GLFW_PRESS )
+   {
+      const auto mode = glfwGetInputMode( window, GLFW_CURSOR );
+      glfwSetInputMode( window, GLFW_CURSOR,
+                        mode == GLFW_CURSOR_DISABLED ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED );
+      actionKeyStates[ KeyAction::TOGGLE_MOUSE_CAPTURE ] = GLFW_REPEAT;
    }
 }
 
@@ -315,10 +384,12 @@ int main()
    initVulkan( VK, window );
 
    // Setup callback function
+   keyboardActionInit();
    glfwSetKeyCallback( window, keyCB );
    glfwSetWindowUserPointer( window, &VK );  // Set user data
    glfwSetWindowSizeCallback( window, onWindowResized );
    glfwSetCursorPosCallback( window, onMousePos );
+   glfwSetInputMode( window, GLFW_CURSOR, GLFW_CURSOR_DISABLED );
 
    UniformBufferObject ubo = {};
 
@@ -340,6 +411,7 @@ int main()
       }
       updateCoreDll();
       glfwPollEvents();
+      pollKeyboard( window );
       updateUBO( cam, ubo );
       VK.updateUBO( ubo );
       // std::cout << ptr() << std::endl;
@@ -354,6 +426,8 @@ int main()
          nextFpsPrintTime += 1s;
       }
    }
+
+   threadPool.stop();
 
    glfwDestroyWindow( window );
    glfwTerminate();

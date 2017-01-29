@@ -1033,13 +1033,13 @@ bool VulkanGraphic::createCommandBuffers()
       vkCmdBindDescriptorSets( _commandBuffers[ i ], VK_PIPELINE_BIND_POINT_GRAPHICS,
                                _pipelineLayout, 0, 1, &_descriptorSet, 0, nullptr );
 
-      if (_verticesCount > 0 )
+      if ( _verticesCount > 0 )
       {
          VkBuffer vertexBuffers[] = {_vertexBuffer};
          VkDeviceSize offsets[] = {0};
          vkCmdBindVertexBuffers( _commandBuffers[ i ], 0, 1, vertexBuffers, offsets );
          vkCmdBindIndexBuffer( _commandBuffers[ i ], _indexBuffer, 0, VK_INDEX_TYPE_UINT32 );
-		 vkCmdDrawIndexed(_commandBuffers[i], _indexCount, 1, 0, 0, 0);
+         vkCmdDrawIndexed( _commandBuffers[ i ], _indexCount, 1, 0, 0, 0 );
       }
 
       vkCmdEndRenderPass( _commandBuffers[ i ] );

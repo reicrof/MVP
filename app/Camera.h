@@ -18,6 +18,7 @@ class Camera
    void setOrientation( const quat& ori );
 
    vec3 getForward() const;
+   vec3 getRight() const;
    const mat4& getView() const;
    const mat4& getProj() const;
    void setExtent( unsigned width, unsigned height );
