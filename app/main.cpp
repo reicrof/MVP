@@ -238,36 +238,41 @@ void updateUBO( const Camera& cam, UniformBufferObject& ubo )
    ubo.proj = cam.getProj();
 }
 
-#define GLM_ENABLE_EXPERIMENTAL
-#include "glm/gtx/euler_angles.hpp"
+#include "glmIncludes.h"
 Camera cam( 45.0f, 1920, 1080, 0.1f, 20 );
 void onMousePos( GLFWwindow* window, double x, double y )
 {
-   const double PI = 3.1415926535897;
-   static const double X_SENSITIVITY = 0.002;
-   static const double Y_SENSITIVITY = 0.002;
+   constexpr double X_SENSITIVITY = 0.002;
+   constexpr double Y_SENSITIVITY = 0.002;
 
-   static glm::vec2 startPos( y * Y_SENSITIVITY, x * X_SENSITIVITY );
-   static bool shouldResetStartPos = false;
+   static glm::vec2 lastPos( x, y );
+
+   // Compute delta and save last cursor pos
+   const glm::vec2 delta = lastPos - glm::vec2( x, y );
+   lastPos = glm::vec2( x, y );
+
+   // If we have not capture the cursor, return
    if ( glfwGetInputMode( window, GLFW_CURSOR ) == GLFW_CURSOR_NORMAL )
    {
-      shouldResetStartPos = true;
       return;
    }
 
-   if ( shouldResetStartPos )
-   {
-      glm::vec3 valueOnExit = glm::eulerAngles( cam.getOrientation() );
-      startPos = glm::vec2( valueOnExit.x, valueOnExit.y ) +
-                 glm::vec2( ( y * Y_SENSITIVITY ), x * X_SENSITIVITY );
-      shouldResetStartPos = false;
-   }
+   // Compute the new orientation by combining the current orientation of the camera with the delta
+   // movement of the mouse.
+   const glm::quat rot =
+      cam.getOrientation() * glm::normalize( glm::quat( glm::vec3(
+                                delta.y * Y_SENSITIVITY, delta.x * X_SENSITIVITY, 0.0f ) ) );
 
-   const double yVal = std::clamp( y * Y_SENSITIVITY, -PI / 2.0, PI / 2.0 );
-   const glm::quat rot = glm::normalize(
-      glm::quat( glm::vec3( startPos - glm::vec2( yVal, x * X_SENSITIVITY ), 0.0 ) ) );
+   glm::vec3 newForward = rot * FORWARD_VCT;
+   newForward.y = std::clamp( newForward.y, -0.93f, 0.93f );
 
-   cam.setOrientation( rot );
+   std::cout << x << " " << y << std::endl;
+   //std::cout << glm::to_string( newForward ) << std::endl;
+
+   // Use the lookat function to compute the final quaternion that contains no roll.
+   const glm::quat finalRot = glm::conjugate(
+      glm::toQuat( glm::lookAt( cam.getPos(), cam.getPos() - newForward, UP_VCT ) ) );
+   cam.setOrientation( finalRot );
 }
 
 namespace KeyAction

@@ -1,7 +1,6 @@
 #include "Camera.h"
-#include <glm/gtc/matrix_transform.hpp>
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/quaternion.hpp>
+
+using namespace glm;
 
 Camera::Camera( float fovInDeg, unsigned width, unsigned height, float near, float far )
     : _fovInRad( glm::radians( fovInDeg ) ),
@@ -42,14 +41,12 @@ void Camera::setOrientation( const quat& ori )
 
 vec3 Camera::getForward() const
 {
-   static const vec3 FORWARD( 0.0f, 0.0f, 1.0f );
-   return _orientation * FORWARD;
+   return _orientation * FORWARD_VCT;
 }
 
 vec3 Camera::getRight() const
 {
-   static const vec3 RIGHT( 1.0f, 0.0f, 0.0f );
-   return _orientation * RIGHT;
+   return _orientation * RIGHT_VCT;
 }
 
 const mat4& Camera::getView() const

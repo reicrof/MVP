@@ -1,10 +1,7 @@
 #ifndef CAMERA_H_
 #define CAMERA_H_
 
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
-
-using namespace glm;
+#include "glmIncludes.h"
 
 class Camera
 {
@@ -12,25 +9,25 @@ class Camera
    Camera( float fovInDeg, unsigned width, unsigned height, float near, float far );
    ~Camera() = default;
 
-   const vec3& getPos() const;
-   void setPos( const vec3& pos );
-   const quat& getOrientation() const;
-   void setOrientation( const quat& ori );
+   const glm::vec3& getPos() const;
+   void setPos( const glm::vec3& pos );
+   const glm::quat& getOrientation() const;
+   void setOrientation( const glm::quat& ori );
 
-   vec3 getForward() const;
-   vec3 getRight() const;
-   const mat4& getView() const;
-   const mat4& getProj() const;
+   glm::vec3 getForward() const;
+   glm::vec3 getRight() const;
+   const glm::mat4& getView() const;
+   const glm::mat4& getProj() const;
    void setExtent( unsigned width, unsigned height );
    const unsigned getWidth() const;
    const unsigned getHeight() const;
 
   private:
-  inline void updateViewMatrix();
-   mat4 _view;
-   mat4 _proj;
-   vec3 _position;
-   quat _orientation;
+   inline void updateViewMatrix();
+   glm::mat4 _view;
+   glm::mat4 _proj;
+   glm::vec3 _position;
+   glm::quat _orientation;
    float _fovInRad;
    unsigned _width;
    unsigned _height;
