@@ -259,20 +259,33 @@ void onMousePos( GLFWwindow* window, double x, double y )
 
    // Compute the new orientation by combining the current orientation of the camera with the delta
    // movement of the mouse.
-   const glm::quat rot =
-      cam.getOrientation() * glm::normalize( glm::quat( glm::vec3(
-                                delta.y * Y_SENSITIVITY, delta.x * X_SENSITIVITY, 0.0f ) ) );
+   // const glm::quat rot =
+   //    cam.getOrientation() * glm::normalize( glm::quat( glm::vec3(
+   //                              delta.y * Y_SENSITIVITY, delta.x * X_SENSITIVITY, 0.0f ) ) );
 
-   glm::vec3 newForward = rot * FORWARD_VCT;
-   newForward.y = std::clamp( newForward.y, -0.93f, 0.93f );
+   //const auto euler = glm::eulerAngles( cam.getOrientation() );
+  
+   const glm::quat yaw = cam.getOrientation() * glm::angleAxis((float)(delta.x * X_SENSITIVITY), UP_VCT);
+   const glm::quat pitch = glm::angleAxis( (float)(delta.y * Y_SENSITIVITY), RIGHT_VCT);
+   const glm::quat finalRot = yaw * pitch;
 
-   std::cout << x << " " << y << std::endl;
-   //std::cout << glm::to_string( newForward ) << std::endl;
+   const auto right = finalRot * RIGHT_VCT;
+   const auto targetRight = glm::normalize( glm::vec3(right.x, 0.0f, right.z) );
+   const glm::quat corr(right, targetRight);
+
+//   const auto euler = glm::eulerAngles(final);
+   //std::cout << glm::to_string(euler) << std::endl;
+
+   //glm::vec3 newForward = rot * FORWARD_VCT;
+  // newForward.y = std::clamp( newForward.y, -0.93f, 0.93f );
+
+   //std::cout << x << " " << y << std::endl;
+   // std::cout << glm::to_string( newForward ) << std::endl;
 
    // Use the lookat function to compute the final quaternion that contains no roll.
-   const glm::quat finalRot = glm::conjugate(
-      glm::toQuat( glm::lookAt( cam.getPos(), cam.getPos() - newForward, UP_VCT ) ) );
-   cam.setOrientation( finalRot );
+   //const glm::quat finalRot = glm::conjugate(
+  //    glm::toQuat( glm::lookAt( cam.getPos(), cam.getPos() - newForward, UP_VCT ) ) );
+   cam.setOrientation( glm::normalize( corr * finalRot ) );
 }
 
 namespace KeyAction
