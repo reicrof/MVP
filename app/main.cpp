@@ -245,36 +245,10 @@ void onMousePos( GLFWwindow* window, double x, double y )
    constexpr double X_SENSITIVITY = 0.002;
    constexpr double Y_SENSITIVITY = 0.002;
 
-   int w, h;
-   glfwGetWindowSize(window, &w, &h);
-   int x = (int)x % w;
-   int y = (int)x % w;
-
+      static glm::vec2 startPos(x, y);
    
-
-   static bool shouldResetStartPos = false;
-   static glm::vec2 startPos( x, y );
-   static glm::vec2 exitPos(x, y);
-
-   // If we have not capture the cursor, return
-   if ( glfwGetInputMode( window, GLFW_CURSOR ) == GLFW_CURSOR_NORMAL )
-   {
-      shouldResetStartPos = true;
-      return;
-   }
-
-   if (shouldResetStartPos)
-   {
-	   shouldResetStartPos = false;
-	   startPos = exitPos + glm::vec2(x, y);
-   }
-   else
-   {
-	   exitPos = glm::vec2(startPos.x - x, startPos.y - y);
-   }
-
    const glm::quat ori(
-      glm::vec3( ( startPos.y - y ) * Y_SENSITIVITY, ( startPos.x - x ) * X_SENSITIVITY, 0.0f ) );
+      glm::vec3( ( startPos.y - y) * Y_SENSITIVITY, ( startPos.x - x) * X_SENSITIVITY, 0.0f ) );
    cam.setOrientation( ori );
 }
 
@@ -390,6 +364,8 @@ int main()
 
    VulkanGraphic VK( extensions );
    initVulkan( VK, window );
+
+   cam.setPos(glm::vec3(0.0f, 0.0f, 10.0f));
 
    // Setup callback function
    keyboardActionInit();

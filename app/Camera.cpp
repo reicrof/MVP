@@ -13,8 +13,8 @@ Camera::Camera( float fovInDeg, unsigned width, unsigned height, float near, flo
    // Flip Y (because Vulkan)
    _proj[ 1 ][ 1 ] *= -1;
 
-   _view = glm::lookAt( glm::vec3( 2.0f, 2.0f, 2.0f ), glm::vec3( 0.0f, 0.0f, 0.0f ),
-                        glm::vec3( 0.0f, 0.0f, 1.0f ) );
+   _view = glm::lookAt( glm::vec3( 5.0f, 0.0f, 0.0f ), glm::vec3( 0.0f, 0.0f, 0.0f ),
+                        glm::vec3( 0.0f, 1.0f, 0.0f ) );
 }
 
 const vec3& Camera::getPos() const
