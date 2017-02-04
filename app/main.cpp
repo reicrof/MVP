@@ -154,7 +154,7 @@ static bool loadModelImp( const std::string& path,
    std::vector<tinyobj::material_t> materials;
    std::string err;
 
-   bool success = tinyobj::LoadObj( &attrib, &shapes, &materials, &err, "../models/armadillo.obj" );
+   bool success = tinyobj::LoadObj( &attrib, &shapes, &materials, &err, path.c_str());
    if ( success )
    {
       vertices->reserve( attrib.vertices.size() / 3 );
@@ -207,6 +207,7 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createSwapChain(), "Cannot create swap chain." );
    VERIFY( VK.createMemoryPool(), "Cannot create buffer memory pool." );
    VERIFY( VK.createRenderPass(), "Cannot create a render pass." );
+   VERIFY( VK.createWidgetRenderPass(), "Cannot create a render pass." );
    VERIFY( VK.createDescriptorSetLayout(), "Cannot create descriptor set layout" );
    VERIFY( VK.createPipeline(), "Cannot create the pipeline." );
    VERIFY( VK.createCommandPool(), "Cannot create command pool." );
@@ -245,10 +246,10 @@ void onMousePos( GLFWwindow* window, double x, double y )
    constexpr double X_SENSITIVITY = 0.002;
    constexpr double Y_SENSITIVITY = 0.002;
 
-      static glm::vec2 startPos(x, y);
-   
+   static glm::vec2 startPos( x, y );
+
    const glm::quat ori(
-      glm::vec3( ( startPos.y - y) * Y_SENSITIVITY, ( startPos.x - x) * X_SENSITIVITY, 0.0f ) );
+      glm::vec3( ( startPos.y - y ) * Y_SENSITIVITY, ( startPos.x - x ) * X_SENSITIVITY, 0.0f ) );
    cam.setOrientation( ori );
 }
 
@@ -350,6 +351,7 @@ int main()
    std::vector<Vertex> vertices;
    std::vector<uint32_t> indices;
    auto done = loadModel( threadPool, "../models/armadillo.obj", &vertices, &indices );
+   //auto done = loadModel(threadPool, "../models/crate.obj", &vertices, &indices);
 
    glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
    GLFWwindow* window = glfwCreateWindow( 800, 600, "MVP", nullptr, nullptr );
@@ -365,7 +367,7 @@ int main()
    VulkanGraphic VK( extensions );
    initVulkan( VK, window );
 
-   cam.setPos(glm::vec3(0.0f, 0.0f, 10.0f));
+   cam.setPos( glm::vec3( 0.0f, 0.0f, 10.0f ) );
 
    // Setup callback function
    keyboardActionInit();

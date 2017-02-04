@@ -544,6 +544,79 @@ bool VulkanGraphic::createMemoryPool()
    return true;
 }
 
+bool VulkanGraphic::createWidgetRenderPass()
+{
+   // // Color attachement
+   // VkAttachmentDescription colorAttachment = {};
+   // colorAttachment.format = _swapChain->getCurrentFormat();
+   // colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+   // colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+   // colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+   // colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+   // colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+   // colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+   // colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+   // VkAttachmentReference colorAttachmentRef = {};
+   // colorAttachmentRef.attachment = 0;
+   // colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+   // // Depth attachement
+   // VkAttachmentDescription depthAttachment = {};
+   // depthAttachment.format = VK_FORMAT_D32_SFLOAT;
+   // depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+   // depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+   // depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+   // depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+   // depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+   // depthAttachment.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+   // depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+   // VkAttachmentReference depthAttachmentRef = {};
+   // depthAttachmentRef.attachment = 1;
+   // depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+   // VkSubpassDescription subPass = {};
+   // subPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+   // subPass.colorAttachmentCount = 1;
+   // subPass.pColorAttachments = &colorAttachmentRef;
+   // subPass.pDepthStencilAttachment = &depthAttachmentRef;
+
+   // std::vector<VkSubpassDependency> subpassDependencies = {
+   //    {
+   //       VK_SUBPASS_EXTERNAL,                   // uint32_t  before subpass
+   //       0,                                     // uint32_t  current subpass
+   //       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,  // VkPipelineStageFlags           srcStageMask
+   //       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  // VkPipelineStageFlags dstStageMask
+   //       VK_ACCESS_MEMORY_READ_BIT,             // VkAccessFlags                  srcAccessMask
+   //       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,  // VkAccessFlags                  dstAccessMask
+   //       VK_DEPENDENCY_BY_REGION_BIT            // VkDependencyFlags              dependencyFlags
+   //    },
+   //    {
+   //       0,                                              // uint32_t  current subpass
+   //       VK_SUBPASS_EXTERNAL,                            // uint32_t  after subpass
+   //       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,  // VkPipelineStageFlags srcStageMask
+   //       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,  // VkPipelineStageFlags           dstStageMask
+   //       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,  // VkAccessFlags                  srcAccessMask
+   //       VK_ACCESS_MEMORY_READ_BIT,             // VkAccessFlags                  dstAccessMask
+   //       VK_DEPENDENCY_BY_REGION_BIT            // VkDependencyFlags              dependencyFlags
+   //    }};
+
+   // std::array<VkAttachmentDescription, 2> attachments = {{colorAttachment, depthAttachment}};
+   // VkRenderPassCreateInfo renderPassInfo = {};
+   // renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+   // renderPassInfo.attachmentCount = static_cast<uint32_t>( attachments.size() );
+   // renderPassInfo.pAttachments = attachments.data();
+   // renderPassInfo.subpassCount = 1;
+   // renderPassInfo.pSubpasses = &subPass;
+   // renderPassInfo.dependencyCount = static_cast<uint32_t>( subpassDependencies.size() );
+   // renderPassInfo.pDependencies = subpassDependencies.data();
+
+   // VK_CALL( vkCreateRenderPass( _device, &renderPassInfo, nullptr, &_widgetRenderPass ) );
+
+    return true;
+}
+
 bool VulkanGraphic::createRenderPass()
 {
    // Color attachement
@@ -775,6 +848,7 @@ bool VulkanGraphic::createPipeline()
    pipelineLayoutInfo.pSetLayouts = setLayout;
 
    VK_CALL( vkCreatePipelineLayout( _device, &pipelineLayoutInfo, nullptr, &_pipelineLayout ) );
+   VK_CALL(vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &_widgetPipelineLayout));
 
    VkGraphicsPipelineCreateInfo pipelineInfo = {};
    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -797,6 +871,37 @@ bool VulkanGraphic::createPipeline()
 
    VK_CALL( vkCreateGraphicsPipelines( _device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
                                        &_graphicsPipeline ) );
+
+   // Create widget pipeline
+
+   VDeleter<VkShaderModule> widgetvertShaderModule{ _device, vkDestroyShaderModule };
+   VDeleter<VkShaderModule> widgetfragShaderModule{ _device, vkDestroyShaderModule };
+   createShaderModule("../shaders/widgetVert.spv", widgetvertShaderModule);
+   createShaderModule("../shaders/widgetFrag.spv", widgetfragShaderModule);
+
+   // Vertex stage
+   VkPipelineShaderStageCreateInfo widgetvShaderStageCreateInfo = {};
+   widgetvShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+   widgetvShaderStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+   widgetvShaderStageCreateInfo.module = widgetvertShaderModule;
+   widgetvShaderStageCreateInfo.pName = "main";
+
+   // Fragment stage
+   VkPipelineShaderStageCreateInfo widgetfShaderStageInfo = {};
+   widgetfShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+   widgetfShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+   widgetfShaderStageInfo.module = widgetfragShaderModule;
+   widgetfShaderStageInfo.pName = "main";
+
+   VkPipelineShaderStageCreateInfo widgetStages[] = { widgetvShaderStageCreateInfo, widgetfShaderStageInfo };
+
+	pipelineInfo.pStages = widgetStages;
+
+	depthStencil.depthTestEnable = VK_FALSE;
+	pipelineInfo.pDepthStencilState = &depthStencil;
+
+	VK_CALL(vkCreateGraphicsPipelines(_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+		&_graphicsWidgetPipeline));
 
    return true;
 }
@@ -1000,49 +1105,65 @@ bool VulkanGraphic::createCommandBuffers()
 
       vkBeginCommandBuffer( _commandBuffers[ i ], &beginInfo );
 
-      VkRenderPassBeginInfo renderPassInfo = {};
-      renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-      renderPassInfo.renderPass = _renderPass;
-      renderPassInfo.framebuffer = _framebuffers[ i ];
-      renderPassInfo.renderArea.offset = {0, 0};
-      renderPassInfo.renderArea.extent = _swapChain->_curExtent;
-
-      std::array<VkClearValue, 2> clearColors;
-      clearColors[ 0 ].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-      clearColors[ 1 ].depthStencil = {1.0f, 0};
-
-      renderPassInfo.clearValueCount = static_cast<uint32_t>( clearColors.size() );
-      renderPassInfo.pClearValues = clearColors.data();
-
-      vkCmdBeginRenderPass( _commandBuffers[ i ], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE );
-
-      vkCmdBindPipeline( _commandBuffers[ i ], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline );
-
-      VkViewport viewport = {0.0f,
-                             0.0f,
-                             static_cast<float>( _swapChain->_curExtent.width ),
-                             static_cast<float>( _swapChain->_curExtent.height ),
-                             0.0f,
-                             1.0f};
-
-      VkRect2D scissor = {{0, 0}, {_swapChain->_curExtent.width, _swapChain->_curExtent.height}};
-
-      vkCmdSetViewport( _commandBuffers[ i ], 0, 1, &viewport );
-      vkCmdSetScissor( _commandBuffers[ i ], 0, 1, &scissor );
-
-      vkCmdBindDescriptorSets( _commandBuffers[ i ], VK_PIPELINE_BIND_POINT_GRAPHICS,
-                               _pipelineLayout, 0, 1, &_descriptorSet, 0, nullptr );
-
-      if ( _verticesCount > 0 )
       {
-         VkBuffer vertexBuffers[] = {_vertexBuffer};
-         VkDeviceSize offsets[] = {0};
-         vkCmdBindVertexBuffers( _commandBuffers[ i ], 0, 1, vertexBuffers, offsets );
-         vkCmdBindIndexBuffer( _commandBuffers[ i ], _indexBuffer, 0, VK_INDEX_TYPE_UINT32 );
-         vkCmdDrawIndexed( _commandBuffers[ i ], _indexCount, 1, 0, 0, 0 );
+         VkRenderPassBeginInfo renderPassInfo = {};
+         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+         renderPassInfo.renderPass = _renderPass;
+         renderPassInfo.framebuffer = _framebuffers[ i ];
+         renderPassInfo.renderArea.offset = {0, 0};
+         renderPassInfo.renderArea.extent = _swapChain->_curExtent;
+
+         std::array<VkClearValue, 2> clearColors;
+         clearColors[ 0 ].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+         clearColors[ 1 ].depthStencil = {1.0f, 0};
+
+         renderPassInfo.clearValueCount = static_cast<uint32_t>( clearColors.size() );
+         renderPassInfo.pClearValues = clearColors.data();
+
+         vkCmdBeginRenderPass( _commandBuffers[ i ], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE );
+
+         vkCmdBindPipeline( _commandBuffers[ i ], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            _graphicsPipeline );
+
+         VkViewport viewport = {0.0f,
+                                0.0f,
+                                static_cast<float>( _swapChain->_curExtent.width ),
+                                static_cast<float>( _swapChain->_curExtent.height ),
+                                0.0f,
+                                1.0f};
+
+         VkRect2D scissor = {{0, 0}, {_swapChain->_curExtent.width, _swapChain->_curExtent.height}};
+
+         vkCmdSetViewport( _commandBuffers[ i ], 0, 1, &viewport );
+         vkCmdSetScissor( _commandBuffers[ i ], 0, 1, &scissor );
+
+         vkCmdBindDescriptorSets( _commandBuffers[ i ], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                  _pipelineLayout, 0, 1, &_descriptorSet, 0, nullptr );
+
+         if ( _verticesCount > 0 )
+         {
+            VkBuffer vertexBuffers[] = {_vertexBuffer};
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindVertexBuffers( _commandBuffers[ i ], 0, 1, vertexBuffers, offsets );
+            vkCmdBindIndexBuffer( _commandBuffers[ i ], _indexBuffer, 0, VK_INDEX_TYPE_UINT32 );
+            vkCmdDrawIndexed( _commandBuffers[ i ], _indexCount, 1, 0, 0, 0 );
+         }
+
+		 vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+			 _graphicsWidgetPipeline);
+
+		 if (_verticesCount > 0)
+		 {
+			 VkBuffer vertexBuffers[] = { _vertexBuffer };
+			 VkDeviceSize offsets[] = { 0 };
+			 vkCmdBindVertexBuffers(_commandBuffers[i], 0, 1, vertexBuffers, offsets);
+			 vkCmdBindIndexBuffer(_commandBuffers[i], _indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+			 vkCmdDrawIndexed(_commandBuffers[i], _indexCount, 1, 0, 0, 0);
+		 }
+
+         vkCmdEndRenderPass( _commandBuffers[ i ] );
       }
 
-      vkCmdEndRenderPass( _commandBuffers[ i ] );
 
       VK_CALL( vkEndCommandBuffer( _commandBuffers[ i ] ) );
    }

@@ -38,6 +38,7 @@ class VulkanGraphic
    bool createSwapChain();
    bool createMemoryPool();
    bool createRenderPass();
+   bool createWidgetRenderPass();
    bool createPipeline();
    bool createFrameBuffers();
    bool createCommandPool();
@@ -92,9 +93,12 @@ class VulkanGraphic
    VDeleter<VkSurfaceKHR> _surface{_instance, vkDestroySurfaceKHR};
    std::unique_ptr<SwapChain> _swapChain;
    VDeleter<VkRenderPass> _renderPass{_device, vkDestroyRenderPass};
+   VDeleter<VkRenderPass> _widgetRenderPass{_device, vkDestroyRenderPass};
    VDeleter<VkDescriptorSetLayout> _descriptorSetLayout{_device, vkDestroyDescriptorSetLayout};
    VDeleter<VkPipelineLayout> _pipelineLayout{_device, vkDestroyPipelineLayout};
    VDeleter<VkPipeline> _graphicsPipeline{_device, vkDestroyPipeline};
+   VDeleter<VkPipelineLayout> _widgetPipelineLayout{_device, vkDestroyPipelineLayout};
+   VDeleter<VkPipeline> _graphicsWidgetPipeline{_device, vkDestroyPipeline};
    std::vector<VDeleter<VkFramebuffer>> _framebuffers;
    VDeleter<VkCommandPool> _commandPool{_device, vkDestroyCommandPool};
    VCommandPool _singleTimeCommandPool{_device, 100};
