@@ -18,30 +18,103 @@ class ThreadPool
   public:
    using Job = std::function<void()>;
 
-#include "ThreadPool.h"
+   class JobQueue
+   {
+	   std::queue<Job> _jobs;
+	   std::mutex _mutex;
+	   std::condition_variable _isReady;
+	   bool _stopped;
+   public:
+	   JobQueue() : _stopped(false) {}
 
-   ThreadPool( int threadCount ) : _stopped( false )
+	   template< typename T >
+	   bool tryAddJob(std::shared_ptr< std::packaged_task<T> >&& job)
+	   {
+		   {
+			   std::unique_lock<std::mutex> lock(_mutex, std::try_to_lock);
+			   if (!lock.owns_lock()) return false;
+			   _jobs.emplace([job]() { (*job)(); });
+		   }
+		   _isReady.notify_one();
+		   return true;
+	   }
+
+	   // This will block the thread, waiting to add the job
+	   template< typename T >
+	   void addJob(std::shared_ptr< std::packaged_task<T> >&& job)
+	   {
+		   {
+			   std::unique_lock<std::mutex> lock(_mutex);
+			   _jobs.emplace([job]() { (*job)(); });
+		   }
+		   _isReady.notify_one();
+	   }
+
+	   bool tryGetJob(Job& job)
+	   {
+		   std::unique_lock<std::mutex> lock(_mutex, std::try_to_lock);
+		   if (!lock.owns_lock() || _jobs.empty()) return false;
+		   job = std::move(_jobs.front());
+		   _jobs.pop();
+		   return true;
+	   }
+
+	   // This will block the thread, waiting for a job.
+	   bool getJob(Job& job)
+	   {
+		   std::unique_lock<std::mutex> lock(_mutex);
+		   while (_jobs.empty() && !_stopped) _isReady.wait(lock);
+		   if (_jobs.empty()) return false;
+		   job = std::move(_jobs.front());
+		   _jobs.pop();
+		   return true;
+	   }
+
+	   void stop()
+	   {
+		   {
+			   std::unique_lock<std::mutex> lock(_mutex);
+			   _stopped = true;
+		   }
+		   _isReady.notify_all();
+	   }
+   };
+
+
+	std::vector<std::thread> _threads;
+	std::vector< JobQueue > _queues;
+	std::atomic< size_t > _queueIndex;
+	size_t _queueCount;
+
+public:
+
+	ThreadPool(size_t threadCount) : _queues(threadCount), _queueIndex(0), _queueCount(threadCount)
    {
       _threads.reserve( threadCount );
-      for ( int i = 0; i < threadCount; ++i )
+      for ( size_t i = 0; i < threadCount; ++i )
       {
-         _threads.emplace_back( [&]() {
+         _threads.emplace_back( [this, threadCount, i]() {
             for ( ;; )
             {
                Job job;
                {
-                  // Waiting for jobs
-                  std::unique_lock<std::mutex> lock( _jobsMutex );
-                  _condition.wait( lock, [&]() { return !_jobs.empty() || _stopped; } );
+				   // Try to get a job from current queue. If it fails, steal
+				   // a job from one of the other queue.
+				   for (size_t j = 0; j < (threadCount*32) && !job; ++j)
+				   {
+					   _queues[(i + j) % threadCount].tryGetJob(job);
+				   }
 
-                  // Got a job or should we stop ?
-                  if ( _stopped && _jobs.empty() )
-                  {
-                     return;
-                  }
+				   // If stealing did not work either, wait until we have a
+				   // job in our queue. If getJob fails, it means the thread
+				   // is shutting down, so our work is done here.
+				   if (!job)
+				   {
+					   if (!_queues[i].getJob(job)) return;
+				   }
 
-                  job = std::move( _jobs.front() );
-                  _jobs.pop();
+				   // We should have a job if we get here.
+				   assert(job);
                }
 
                // Execute the job
@@ -57,20 +130,31 @@ class ThreadPool
       auto jobTask =
            std::make_shared< std::packaged_task<typename std::result_of<F( Args... )>::type()> >(
             std::bind( std::forward<F>( f ), std::forward<Args>( args )... ) );
-      assert( !_stopped );
+  
       auto futureRes = jobTask->get_future();
-      {
-         std::unique_lock<std::mutex> lock( _jobsMutex );
-         _jobs.emplace( [jobTask]() { ( *jobTask )(); } );
-      }
-      _condition.notify_one();
+
+	  auto i = _queueIndex++;
+	  for (size_t j = 0; j < _queueCount; ++j)
+	  {
+		  const size_t qIndex = (i + j) % _queueCount;
+		  if (_queues[qIndex].tryAddJob(std::forward< decltype(jobTask)>(jobTask)))
+		  {
+			  return futureRes;
+		  }
+	  }
+
+	  // Blocks until we have added the job
+	  _queues[i % _queueCount].addJob(std::forward< decltype(jobTask)>(jobTask));
+
       return futureRes;
    }
 
    void stop()
    {
-      _stopped = true;
-      _condition.notify_all();
+	   for (auto& q : _queues)
+	   {
+		   q.stop();
+	   }
    }
 
    ~ThreadPool()
@@ -81,13 +165,6 @@ class ThreadPool
          t.join();
       }
    }
-
-  private:
-   std::vector<std::thread> _threads;
-   std::queue<Job> _jobs;
-   std::mutex _jobsMutex;
-   std::condition_variable _condition;
-   std::atomic<bool> _stopped;
 };
 
 #endif  // _THREAD_POOL_H_
