@@ -233,7 +233,7 @@ void updateUBO( const Camera& cam, UniformBufferObject& ubo )
       10000.0f;
 
    ubo.model =
-      glm::rotate( glm::mat4(), /*time **/ glm::radians( 90.0f ), glm::vec3( 0.0f, 1.0f, 0.0f ) );
+      glm::rotate( glm::mat4(), time * glm::radians( 90.0f ), glm::vec3( 0.0f, 1.0f, 0.0f ) );
 
    ubo.view = cam.getView();
    ubo.proj = cam.getProj();
@@ -298,7 +298,6 @@ static void keyCB( GLFWwindow* window, int key, int scancode, int action, int mo
    actionKeyStates[ glfwKeyToAction[ key ] ] = action;
 }
 
-#include <glm/gtx/string_cast.hpp>
 static void pollKeyboard( GLFWwindow* window )
 {
    if ( actionKeyStates[ KeyAction::MOVE_FORWARD ] > 0 )

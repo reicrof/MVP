@@ -25,6 +25,8 @@ class VMemoryPool
 
    uint64_t alloc( uint64_t size, uint64_t alignment );
    void free( VMemAlloc& mem );
+   uint64_t spaceLeft() const;
+   uint64_t totalSize() const;
    operator VkDeviceMemory();
 
   private:
@@ -44,14 +46,21 @@ class VMemoryManager
    void free( VMemAlloc& alloc );
 
   private:
-   struct PoolProperties
+   struct PoolsType
    {
-      VkMemoryPropertyFlags memPropertyFlags;
-      uint32_t memoryTypeBits;
+	   VkMemoryPropertyFlags _properties;
+	   uint32_t _memTypeBits;
+	   PoolsType(const VkMemoryRequirements& requirements,
+		   const VkMemoryPropertyFlags& properties) : _properties(properties), _memTypeBits(requirements.memoryTypeBits) {}
+	   bool operator==(const PoolsType& rhs)
+	   {
+		   return _memTypeBits & rhs._memTypeBits &&
+			   (_properties & rhs._properties) == _properties;
+	   }
    };
 
-   std::vector<std::unique_ptr<VMemoryPool> > _pools;
-   std::vector<PoolProperties> _poolsProperties;
+   std::vector<std::vector< std::unique_ptr<VMemoryPool> > > _pools;
+   std::vector<PoolsType> _poolsProperties;
    const VkPhysicalDevice& _physDevice;
    const VDeleter<VkDevice>& _device;
 };
