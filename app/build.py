@@ -5,7 +5,7 @@ import getopt
 import datetime
 
 outName = "mvp"
-srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp", "MemoryPool.cpp", "vMemoryPool.cpp", "VImage.cpp", "vCommandPool.cpp", "Camera.cpp"]
+srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp", "MemoryPool.cpp", "vMemoryPool.cpp", "vImage.cpp", "vCommandPool.cpp", "Camera.cpp"]
 coreInclude = ["../core/"]
 
 # Third parties includes
@@ -22,9 +22,9 @@ cppVersion = ["-std=c++1z"]
 
 if platform.system() == "Linux":
    compiler = "/DLlocal/landrych/llvm-build/bin/clang++"
-   compilerFlags = [ "-g"]
+   compilerFlags = [ "-g", "-D_DEBUG"]
    glfwLibPath = ["../thirdParties/glfw/"]
-   libs = ["-lglfw3", "-lvulkan-1"]
+   libs = ["-lglfw3", "-lvulkan", "-lrt", "-lm", "-ldl", "-lXrandr", "-lXinerama", "-lXxf86vm", "-lXcursor", "-lXext", "-lXrender", "-lXfixes", "-lX11", "-lpthread", "-lxcb", "-lXau" ]
 
 elif platform.system() == "Windows":
    compiler = "clang++"
