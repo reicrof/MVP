@@ -1402,6 +1402,11 @@ const SwapChain* VulkanGraphic::getSwapChain() const
    return _swapChain.get();
 }
 
+void VulkanGraphic::_debugPrintMemoryMgrInfo() const
+{
+   _memoryManager._debugPrint();
+}
+
 VulkanGraphic::~VulkanGraphic()
 {
    vkDeviceWaitIdle( _device );

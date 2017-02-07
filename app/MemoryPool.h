@@ -6,6 +6,7 @@
 #include <limits>
 #include <algorithm>
 #include <assert.h>
+#include <string>
 
 class MemoryPool
 {
@@ -17,6 +18,7 @@ class MemoryPool
    void free(uint64_t offset);
 
    bool _debugIsConform() const;
+   std::string _debugPrint(int length, char emptyChar, char usedChar ) const;
   
    uint64_t spaceLeft() const { return _freeSpace; }
    uint64_t totalPoolSize() const { return _poolSize; }

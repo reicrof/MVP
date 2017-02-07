@@ -29,6 +29,8 @@ class VMemoryPool
    uint64_t totalSize() const;
    operator VkDeviceMemory();
 
+   std::string _debugPrint( int totalLength, char empty, char used ) const;
+
   private:
    const VDeleter<VkDevice>& _device;
    VDeleter<VkDeviceMemory> _memory{_device, vkFreeMemory};
@@ -44,6 +46,8 @@ class VMemoryManager
    VMemAlloc alloc( const VkMemoryRequirements& requirements,
                     const VkMemoryPropertyFlags& properties );
    void free( VMemAlloc& alloc );
+
+   void _debugPrint() const;
 
   private:
    struct PoolsType

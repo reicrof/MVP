@@ -249,6 +249,7 @@ void updateUBO( const Camera& cam, UniformBufferObject& ubo )
 
 #include "glmIncludes.h"
 Camera cam( 45.0f, 1920, 1080, 0.1f, 20 );
+VulkanGraphic* VKPtr = nullptr;
 void onMousePos( GLFWwindow* window, double x, double y )
 {
    constexpr double X_SENSITIVITY = 0.002;
@@ -305,6 +306,11 @@ static void keyCB( GLFWwindow* window, int key, int scancode, int action,
                    int mods )
 {
    actionKeyStates[glfwKeyToAction[key]] = action;
+
+   if( key == GLFW_KEY_P && action == GLFW_PRESS )
+   {
+      VKPtr->_debugPrintMemoryMgrInfo();
+   }
 }
 
 static void pollKeyboard( GLFWwindow* window )
@@ -377,6 +383,7 @@ int main()
 
    VulkanGraphic VK( extensions );
    initVulkan( VK, window );
+   VKPtr = &VK;
 
    cam.setPos( glm::vec3( 0.0f, 0.0f, 10.0f ) );
 

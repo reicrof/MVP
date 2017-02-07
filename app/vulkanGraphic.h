@@ -62,6 +62,8 @@ class VulkanGraphic
 
    const SwapChain* getSwapChain() const;
 
+   void _debugPrintMemoryMgrInfo() const;
+
   private:
    struct Queue
    {
