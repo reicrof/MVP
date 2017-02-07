@@ -5,7 +5,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
-#include "glm/ext.hpp"
 
 
 static const glm::vec3 RIGHT_VCT( 1.0f, 0.0f, 0.0f );

@@ -65,6 +65,16 @@ void VMemoryPool::free( VMemAlloc& mem )
 #endif  // DEBUG
 }
 
+uint64_t VMemoryPool::spaceLeft() const
+{
+	return _pool.spaceLeft();
+}
+
+uint64_t VMemoryPool::totalSize() const
+{
+	return _pool.totalPoolSize();
+}
+
 VMemoryPool::operator VkDeviceMemory()
 {
    return *_memory.get();
@@ -81,37 +91,80 @@ VMemoryManager::VMemoryManager( const VkPhysicalDevice& physDevice,
 VMemAlloc VMemoryManager::alloc( const VkMemoryRequirements& requirements,
                                  const VkMemoryPropertyFlags& properties )
 {
+	PoolsType curType{ requirements, properties };
+	std::vector< std::unique_ptr<VMemoryPool> >* validPools = nullptr;
    for ( size_t i = 0; i < _poolsProperties.size(); ++i )
    {
-      if ( requirements.memoryTypeBits & _poolsProperties[ i ].memoryTypeBits &&
-           ( properties & _poolsProperties[ i ].memPropertyFlags ) == properties )
+      if ( curType == _poolsProperties[ i ] )
       {
-         return VMemAlloc{*_pools[ i ],
-                          _pools[ i ]->alloc( requirements.size, requirements.alignment )};
+		  // We have found the list of pools that are valid with requested alloc
+		  validPools = &_pools[i];
+		  uint64_t allocOffset = MemoryPool::INVALID_OFFSET;
+		  for (size_t j = 0; j < validPools->size(); ++j)
+		  {
+			  allocOffset = (*validPools)[j]->alloc(requirements.size, requirements.alignment);
+			  if (allocOffset != MemoryPool::INVALID_OFFSET) 
+			  {
+				  return VMemAlloc{ *(*validPools)[j], allocOffset };
+			  }
+		  }
       }
    }
 
    // No pool meets the requirement. Lets create one.
-   size_t size = requirements.size * 4;
-   _poolsProperties.push_back( PoolProperties{properties, requirements.memoryTypeBits} );
-   if (requirements.memoryTypeBits == 1665 && properties == 1)
-   {
-	   size = (20407296*2) + requirements.size * 4;
-   }
-   _pools.push_back( std::make_unique<VMemoryPool>(size, _physDevice, _device,
-                                                    requirements.memoryTypeBits, properties ) );
 
-   return VMemAlloc{*_pools.back(),
-                    _pools.back()->alloc( requirements.size, requirements.alignment )};
+   // If no pools satisfies the type required, create new list of pools
+   VMemoryPool* pool = nullptr;
+   if (!validPools)
+   {
+	   // Creates a new list of pool, with a first pool containing enough space to allocate 4 times the requested amount.
+	   _pools.emplace_back();
+	   _pools.back().emplace_back(std::make_unique<VMemoryPool>(requirements.size * 4, _physDevice, _device,
+		   requirements.memoryTypeBits, properties));
+
+	   // Add the new pool properties to the list property.
+	   _poolsProperties.emplace_back(requirements, properties);
+	   pool = _pools.back().back().get();
+	   //return VMemAlloc{ *_pools.back().back(),
+		  // _pools.back().back()->alloc(requirements.size, requirements.alignment) };
+   }
+   else
+   {
+	   // There is already a list of pools satisfying the required types. We need more memory of this type.
+	   // Lets create a new pool, doubling the size of the previous pool.
+	   const uint64_t newSize = std::max( validPools->back()->totalSize() * 2, requirements.size * 4 );
+	   validPools->emplace_back(std::unique_ptr<VMemoryPool >{ std::make_unique<VMemoryPool>(newSize, _physDevice, _device,
+		   requirements.memoryTypeBits, properties) });
+	   pool = validPools->back().get();
+   }
+
+   assert(pool);
+
+   return VMemAlloc{ *pool, pool->alloc(requirements.size, requirements.alignment) };
+
 }
 
 void VMemoryManager::free( VMemAlloc& alloc )
 {
-   auto it = std::find_if( _pools.begin(), _pools.end(), [&]( const auto& pool ) {
-      return static_cast<VkDeviceMemory>( *pool.get() ) == alloc.memory;
-   } );
+#ifdef _DEBUG
+	bool allocFreed = false;
+#endif
 
-   assert( it != _pools.end() );
+	for (auto& poolList : _pools)
+	{
+		for (auto& pool : poolList)
+		{
+			if (*pool.get() == alloc.memory)
+			{
+				pool->free(alloc);
+#ifdef _DEBUG
+				allocFreed = true;
+#endif
+			}
+		}
+	}
 
-   ( *it )->free( alloc );
+#ifdef _DEBUG
+	assert(allocFreed);
+#endif
 }

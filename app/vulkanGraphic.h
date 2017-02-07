@@ -116,8 +116,8 @@ class VulkanGraphic
    VDeleter<VkBuffer> _indexBuffer{_device, vkDestroyBuffer};
 
    VMemoryManager _memoryManager{_physDevice, _device};
-   uint32_t _verticesCount;
-   uint32_t _indexCount;
+   uint32_t _verticesCount = 0;
+   uint32_t _indexCount = 0;
 
    VDeleter<VkBuffer> _uniformStagingBuffer{_device, vkDestroyBuffer};
    VMemAlloc _uniformStagingBufferMemory;
