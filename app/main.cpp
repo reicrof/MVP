@@ -209,6 +209,7 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createRenderPass(), "Cannot create a render pass." );
    VERIFY( VK.createWidgetRenderPass(), "Cannot create a render pass." );
    VERIFY( VK.createDescriptorSetLayout(), "Cannot create descriptor set layout" );
+   VERIFY(VK.createPipelineCache(), "Cannot create pipeline cache.");
    VERIFY( VK.createPipeline(), "Cannot create the pipeline." );
    VERIFY( VK.createCommandPool(), "Cannot create command pool." );
    VERIFY( VK.createTextureImage(), "Cannot create texture" );
@@ -411,6 +412,8 @@ int main()
          nextFpsPrintTime += 1s;
       }
    }
+
+   VK.savePipelineCacheToDisk();
 
    threadPool.stop();
 
