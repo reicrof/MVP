@@ -166,16 +166,19 @@ std::string MemoryPool::_debugPrint(int rangeLength, char emptyChar, char usedCh
    msg.reserve( rangeLength + 40 );
    msg.push_back('[');
 
-   const int unitSize = _poolSize / (rangeLength - 2);
-
-   for( const auto& chunk : _allocatedChunks )
+   const int range = rangeLength - 2 - _allocatedChunks.size();
+   const float unitSize = _poolSize / static_cast<float>(range);
+   float curUnit = 0.0f;
+   auto it = _allocatedChunks.begin();
+   for (int i = 0; i < range && it != _allocatedChunks.end(); ++i)
    {
-      const char c = chunk.isFree ? emptyChar : usedChar;
-      const int nbUnit = chunk.size / unitSize;
-      for( int i = 0; i < nbUnit; ++i )
-      {
-         msg.push_back( c );
-      }
+	   msg.push_back(it->isFree ? emptyChar : usedChar);
+	   curUnit += unitSize;
+	   if (curUnit > it->size)
+	   {
+		   ++it;
+		   if (it != _allocatedChunks.end()) { msg.push_back('|'); }
+	   }
    }
 
    msg.push_back(']');

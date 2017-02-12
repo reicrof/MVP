@@ -181,7 +181,7 @@ void VMemoryManager::_debugPrint() const
            << " | Mem Type bits : " << _poolsProperties[i]._memTypeBits << endl;
       for (const auto& pool : _pools[i])
       {
-         cout << pool->_debugPrint(90, ' ', '=' ) << '\n';
+         cout << pool->_debugPrint(80, ' ', '=' ) << '\n';
       }
    }
 }
