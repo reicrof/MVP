@@ -13,13 +13,13 @@ class MemoryPool
   public:
    static constexpr uint64_t INVALID_OFFSET = std::numeric_limits<uint64_t>::max();
 
-   MemoryPool(uint64_t size, uint64_t maxAllocCount = 200);
-   uint64_t alloc(uint64_t size, uint64_t alignment);
-   void free(uint64_t offset);
+   MemoryPool( uint64_t size, uint64_t maxAllocCount = 200 );
+   uint64_t alloc( uint64_t size, uint64_t alignment );
+   void free( uint64_t offset );
 
    bool _debugIsConform() const;
-   std::string _debugPrint(int length, char emptyChar, char usedChar ) const;
-  
+   std::string _debugPrint( int length, char emptyChar, char usedChar ) const;
+
    uint64_t spaceLeft() const { return _freeSpace; }
    uint64_t totalPoolSize() const { return _poolSize; }
   private:

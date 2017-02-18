@@ -52,18 +52,19 @@ class VMemoryManager
   private:
    struct PoolsType
    {
-	   VkMemoryPropertyFlags _properties;
-	   uint32_t _memTypeBits;
-	   PoolsType(const VkMemoryRequirements& requirements,
-		   const VkMemoryPropertyFlags& properties) : _properties(properties), _memTypeBits(requirements.memoryTypeBits) {}
-	   bool operator==(const PoolsType& rhs)
-	   {
-		   return _memTypeBits & rhs._memTypeBits &&
-			   (_properties & rhs._properties) == _properties;
-	   }
+      VkMemoryPropertyFlags _properties;
+      uint32_t _memTypeBits;
+      PoolsType( const VkMemoryRequirements& requirements, const VkMemoryPropertyFlags& properties )
+          : _properties( properties ), _memTypeBits( requirements.memoryTypeBits )
+      {
+      }
+      bool operator==( const PoolsType& rhs )
+      {
+         return _memTypeBits & rhs._memTypeBits && ( _properties & rhs._properties ) == _properties;
+      }
    };
 
-   std::vector<std::vector< std::unique_ptr<VMemoryPool> > > _pools;
+   std::vector<std::vector<std::unique_ptr<VMemoryPool> > > _pools;
    std::vector<PoolsType> _poolsProperties;
    const VkPhysicalDevice& _physDevice;
    const VDeleter<VkDevice>& _device;

@@ -1,21 +1,21 @@
 #include "vCommandPool.h"
 
-VCommandPool::VCommandPool( VDeleter<VkDevice>& device, uint32_t size )
-    : _device( device ),
-      _commandPool( device, vkDestroyCommandPool ),
-      _freeCmdBuffers( size, true ),
-      _size( size )
+VCommandPool::VCommandPool() : _device( VK_NULL_HANDLE ), _nextFreeIdx( 0 ), _queueFamilly( -1 )
 {
-   _commandBuffers.resize( size );
 }
 
-void VCommandPool::init( VkCommandPoolCreateFlags flag, uint32_t queueFamilyIndex )
+void VCommandPool::init( VkDevice device,
+                         uint32_t size,
+                         VkCommandPoolCreateFlags flag,
+                         uint32_t queueFamilyIndex )
 {
-   _queue = queueFamilyIndex;
+   _device = device;
+   _commandBuffers.resize( size );
+   _queueFamilly = queueFamilyIndex;
    // Create the VkPool first
    VkCommandPoolCreateInfo poolInfo = {};
    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-   poolInfo.queueFamilyIndex = _queue;
+   poolInfo.queueFamilyIndex = _queueFamilly;
    poolInfo.flags = flag;
 
    VK_CALL( vkCreateCommandPool( _device, &poolInfo, nullptr, &_commandPool ) );
@@ -25,41 +25,63 @@ void VCommandPool::init( VkCommandPoolCreateFlags flag, uint32_t queueFamilyInde
    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
    allocInfo.commandPool = _commandPool;
-   allocInfo.commandBufferCount = _size;
+   allocInfo.commandBufferCount = size;
 
    vkAllocateCommandBuffers( _device, &allocInfo, _commandBuffers.data() );
 }
 
-VkCommandBuffer* VCommandPool::alloc( VkCommandBufferUsageFlagBits flag )
+VkCommandBuffer VCommandPool::alloc( VkCommandBufferUsageFlagBits flag )
 {
    static VkCommandBufferBeginInfo beginInfo = {};
    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
    beginInfo.flags = flag;
 
-   for ( size_t i = 0; i < _size; ++i )
+   if ( _nextFreeIdx >= _commandBuffers.size() )
    {
-      if ( _freeCmdBuffers[ i ] )
-      {
-         _freeCmdBuffers[ i ] = false;
-
-         vkBeginCommandBuffer( _commandBuffers[ i ], &beginInfo );
-         return &_commandBuffers[ i ];
-      }
+      expandCommandBuffers( _commandBuffers.size() );
    }
+   const size_t cmdBuffIdx = _nextFreeIdx++;
 
-   assert( false );
-   return nullptr;
+   vkBeginCommandBuffer( _commandBuffers[ cmdBuffIdx ], &beginInfo );
+   return _commandBuffers[ cmdBuffIdx ];
 }
 
 void VCommandPool::free( VkCommandBuffer& cmdBuffer )
 {
-   for ( size_t i = 0; i < _size; ++i )
+   for ( size_t i = 0; i < _commandBuffers.size(); ++i )
    {
       if ( _commandBuffers[ i ] == cmdBuffer )
       {
-         _freeCmdBuffers[ i ] = true;
+         std::swap( _commandBuffers[ i ], _commandBuffers[ --_nextFreeIdx ] );
          vkResetCommandBuffer( cmdBuffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT );
          return;
       }
    }
+}
+
+void VCommandPool::freeAll()
+{
+   vkResetCommandPool( _device, _commandPool, VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT );
+   _nextFreeIdx = 0;
+}
+
+void VCommandPool::expandCommandBuffers( size_t size )
+{
+   VkCommandBufferAllocateInfo allocInfo = {};
+   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+   allocInfo.commandPool = _commandPool;
+   allocInfo.commandBufferCount = static_cast<uint32_t>( size );
+
+   const size_t oldSize = _commandBuffers.size();
+   _commandBuffers.resize( oldSize + size );
+   vkAllocateCommandBuffers( _device, &allocInfo, &_commandBuffers[ oldSize ] );
+}
+
+VCommandPool::~VCommandPool()
+{
+   vkFreeCommandBuffers( _device, _commandPool, static_cast<uint32_t>( _commandBuffers.size() ),
+                         _commandBuffers.data() );
+   _commandBuffers.clear();
+   vkDestroyCommandPool( _device, _commandPool, nullptr );
 }

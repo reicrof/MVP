@@ -7,20 +7,25 @@
 class VCommandPool
 {
   public:
-   VCommandPool( VDeleter<VkDevice>& device,
-                 uint32_t size );
+   VCommandPool();
+   ~VCommandPool();
 
-   void init(VkCommandPoolCreateFlags flag, uint32_t queueFamilyIndex);
-   VkCommandBuffer* alloc(VkCommandBufferUsageFlagBits flag);
-   void free(VkCommandBuffer& cmdBuffer);
+   void init( VkDevice device,
+              uint32_t size,
+              VkCommandPoolCreateFlags flag,
+              uint32_t queueFamilyIndex );
+   VkCommandBuffer alloc( VkCommandBufferUsageFlagBits flag );
+   void free( VkCommandBuffer& cmdBuffer );
+   void freeAll();
 
   private:
-   VDeleter<VkDevice>& _device;
-   VDeleter<VkCommandPool> _commandPool;
+   void expandCommandBuffers( size_t size );
+
+   VkDevice _device;
+   VkCommandPool _commandPool;
    std::vector<VkCommandBuffer> _commandBuffers;
-   std::vector<bool> _freeCmdBuffers;
-   const uint32_t _size;
-   uint32_t _queue;
+   size_t _nextFreeIdx;
+   uint32_t _queueFamilly;
 };
 
 #endif  //_VCOMMAND_POOL_H_

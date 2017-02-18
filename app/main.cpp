@@ -78,8 +78,10 @@ FILETIME
 getFileTimeFromFile( const char* fileName )
 {
    WIN32_FIND_DATA findFileData;
-   FindFirstFile( fileName, &findFileData );
-   return findFileData.ftLastWriteTime;
+   auto handle = FindFirstFile( fileName, &findFileData );
+   FILETIME time = findFileData.ftLastWriteTime;
+   FindClose( handle );
+   return time;
 }
 #else
 #endif
@@ -87,7 +89,7 @@ getFileTimeFromFile( const char* fileName )
 static void loadCoreFunctions()
 {
 #if defined( WIN32 ) || defined( _WIN32 )
-   if( coreDll )
+   if ( coreDll )
    {
       freeSharedLibrary( coreDll );
    }
@@ -115,33 +117,31 @@ bool shouldReloadCoreLib()
 
 static void onWindowResized( GLFWwindow* window, int width, int height )
 {
-   if( width > 0 && height > 0 )
+   if ( width > 0 && height > 0 )
    {
-      VulkanGraphic* VK = reinterpret_cast<VulkanGraphic*>(
-          glfwGetWindowUserPointer( window ) );
+      VulkanGraphic* VK = reinterpret_cast<VulkanGraphic*>( glfwGetWindowUserPointer( window ) );
       VK->recreateSwapChain();
    }
 }
 
 void updateCoreDll()
 {
-   if( shouldReloadCoreLib() )
+   if ( shouldReloadCoreLib() )
    {
       loadCoreFunctions();
    }
 }
 
 #include "vertex.h"
-const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+const std::vector<Vertex> vertices = {{{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                                      {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                                      {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+                                      {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
 
-    {{-0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
+                                      {{-0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                                      {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                                      {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+                                      {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
 const std::vector<uint32_t> indices = {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
 
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -156,32 +156,30 @@ static bool loadModelImp( const std::string& path,
    std::vector<tinyobj::material_t> materials;
    std::string err;
 
-   bool success =
-       tinyobj::LoadObj( &attrib, &shapes, &materials, &err, path.c_str() );
-   if( success )
+   bool success = tinyobj::LoadObj( &attrib, &shapes, &materials, &err, path.c_str() );
+   if ( success )
    {
       vertices->reserve( attrib.vertices.size() / 3 );
       indices->reserve( attrib.vertices.size() );
-      for( const auto& shape : shapes )
+      for ( const auto& shape : shapes )
       {
-         for( const auto& index : shape.mesh.indices )
+         for ( const auto& index : shape.mesh.indices )
          {
             Vertex vertex = {};
-            vertex.pos = {attrib.vertices[3 * index.vertex_index + 0],
-                          attrib.vertices[3 * index.vertex_index + 1],
-                          attrib.vertices[3 * index.vertex_index + 2]};
-            if( !attrib.normals.empty() )
+            vertex.pos = {attrib.vertices[ 3 * index.vertex_index + 0 ],
+                          attrib.vertices[ 3 * index.vertex_index + 1 ],
+                          attrib.vertices[ 3 * index.vertex_index + 2 ]};
+            if ( !attrib.normals.empty() )
             {
-               vertex.normal = {attrib.normals[3 * index.vertex_index + 0],
-                                attrib.normals[3 * index.vertex_index + 1],
-                                attrib.normals[3 * index.vertex_index + 2]};
+               vertex.normal = {attrib.normals[ 3 * index.vertex_index + 0 ],
+                                attrib.normals[ 3 * index.vertex_index + 1 ],
+                                attrib.normals[ 3 * index.vertex_index + 2 ]};
             }
 
-            if( attrib.texcoords.size() > 0 )
+            if ( attrib.texcoords.size() > 0 )
             {
-               vertex.texCoord = {
-                   attrib.texcoords[2 * index.texcoord_index + 0],
-                   1.0f - attrib.texcoords[2 * index.texcoord_index + 1]};
+               vertex.texCoord = {attrib.texcoords[ 2 * index.texcoord_index + 0 ],
+                                  1.0f - attrib.texcoords[ 2 * index.texcoord_index + 1 ]};
             }
 
             vertices->push_back( vertex );
@@ -198,7 +196,8 @@ static bool loadModelImp( const std::string& path,
 }
 
 #include "ThreadPool.h"
-static auto loadModel( ThreadPool& jobPool, const std::string& path,
+static auto loadModel( ThreadPool& jobPool,
+                       const std::string& path,
                        std::vector<Vertex>* vertices,
                        std::vector<uint32_t>* indices )
 {
@@ -211,12 +210,9 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.getPysicalDevices(), "Cannot get physical device." );
    VERIFY( VK.createLogicalDevice(), "Cannot create logical evice." );
    VERIFY( VK.createSwapChain(), "Cannot create swap chain." );
-   VERIFY( VK.createMemoryPool(), "Cannot create buffer memory pool." );
    VERIFY( VK.createRenderPass(), "Cannot create a render pass." );
-   VERIFY( VK.createWidgetRenderPass(), "Cannot create a render pass." );
-   VERIFY( VK.createDescriptorSetLayout(),
-           "Cannot create descriptor set layout" );
-   VERIFY(VK.createPipelineCache(), "Cannot create pipeline cache.");
+   VERIFY( VK.createDescriptorSetLayout(), "Cannot create descriptor set layout" );
+   VERIFY( VK.createPipelineCache(), "Cannot create pipeline cache." );
    VERIFY( VK.createPipeline(), "Cannot create the pipeline." );
    VERIFY( VK.createCommandPool(), "Cannot create command pool." );
    VERIFY( VK.createTextureImage(), "Cannot create texture" );
@@ -227,7 +223,6 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createUniformBuffer(), "Cannot create uniform buffer." );
    VERIFY( VK.createDescriptorPool(), "Cannot create descriptor pool." );
    VERIFY( VK.createDescriptorSet(), "Cannot create descriptor set." );
-   VERIFY( VK.createCommandBuffers(), "Cannot create frame buffer." );
    VERIFY( VK.createSemaphores(), "Cannot create semaphores." );
 }
 
@@ -236,10 +231,9 @@ void updateUBO( const Camera& cam, UniformBufferObject& ubo )
    static auto startTime = std::chrono::high_resolution_clock::now();
 
    auto currentTime = std::chrono::high_resolution_clock::now();
-   float time = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    currentTime - startTime )
-                    .count() /
-                10000.0f;
+   float time =
+      std::chrono::duration_cast<std::chrono::milliseconds>( currentTime - startTime ).count() /
+      10000.0f;
 
    ubo.model =
       glm::rotate( glm::mat4(), time * glm::radians( 90.0f ), glm::vec3( 0.0f, 1.0f, 0.0f ) );
@@ -256,15 +250,15 @@ void onMousePos( GLFWwindow* window, double x, double y )
    constexpr double X_SENSITIVITY = 0.002;
    constexpr double Y_SENSITIVITY = 0.002;
 
-   if (glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED)
+   if ( glfwGetInputMode( window, GLFW_CURSOR ) != GLFW_CURSOR_DISABLED )
    {
-	   return;
+      return;
    }
 
    static glm::vec2 startPos( x, y );
 
-   const glm::quat ori( glm::vec3( ( startPos.y - y ) * Y_SENSITIVITY,
-                                   ( startPos.x - x ) * X_SENSITIVITY, 0.0f ) );
+   const glm::quat ori(
+      glm::vec3( ( startPos.y - y ) * Y_SENSITIVITY, ( startPos.x - x ) * X_SENSITIVITY, 0.0f ) );
    cam.setOrientation( ori );
 }
 
@@ -293,27 +287,26 @@ static std::array<KeyAction::Action, GLFW_KEY_LAST> glfwKeyToAction = {};
 
 static void keyboardActionInit()
 {
-   glfwKeyToAction[GLFW_KEY_W] = KeyAction::MOVE_FORWARD;
-   glfwKeyToAction[GLFW_KEY_S] = KeyAction::MOVE_BACKWARD;
-   glfwKeyToAction[GLFW_KEY_A] = KeyAction::STRAFE_LEFT;
-   glfwKeyToAction[GLFW_KEY_D] = KeyAction::STRAFE_RIGHT;
-   glfwKeyToAction[GLFW_KEY_ESCAPE] = KeyAction::EXIT;
-   glfwKeyToAction[GLFW_KEY_SPACE] = KeyAction::TOGGLE_MOUSE_CAPTURE;
+   glfwKeyToAction[ GLFW_KEY_W ] = KeyAction::MOVE_FORWARD;
+   glfwKeyToAction[ GLFW_KEY_S ] = KeyAction::MOVE_BACKWARD;
+   glfwKeyToAction[ GLFW_KEY_A ] = KeyAction::STRAFE_LEFT;
+   glfwKeyToAction[ GLFW_KEY_D ] = KeyAction::STRAFE_RIGHT;
+   glfwKeyToAction[ GLFW_KEY_ESCAPE ] = KeyAction::EXIT;
+   glfwKeyToAction[ GLFW_KEY_SPACE ] = KeyAction::TOGGLE_MOUSE_CAPTURE;
 
-   actionKeyStates[KeyAction::MOVE_FORWARD] = GLFW_RELEASE;
-   actionKeyStates[KeyAction::MOVE_BACKWARD] = GLFW_RELEASE;
-   actionKeyStates[KeyAction::STRAFE_LEFT] = GLFW_RELEASE;
-   actionKeyStates[KeyAction::STRAFE_RIGHT] = GLFW_RELEASE;
-   actionKeyStates[KeyAction::EXIT] = GLFW_RELEASE;
-   actionKeyStates[KeyAction::TOGGLE_MOUSE_CAPTURE] = GLFW_RELEASE;
+   actionKeyStates[ KeyAction::MOVE_FORWARD ] = GLFW_RELEASE;
+   actionKeyStates[ KeyAction::MOVE_BACKWARD ] = GLFW_RELEASE;
+   actionKeyStates[ KeyAction::STRAFE_LEFT ] = GLFW_RELEASE;
+   actionKeyStates[ KeyAction::STRAFE_RIGHT ] = GLFW_RELEASE;
+   actionKeyStates[ KeyAction::EXIT ] = GLFW_RELEASE;
+   actionKeyStates[ KeyAction::TOGGLE_MOUSE_CAPTURE ] = GLFW_RELEASE;
 }
 
-static void keyCB( GLFWwindow* window, int key, int scancode, int action,
-                   int mods )
+static void keyCB( GLFWwindow* window, int key, int scancode, int action, int mods )
 {
-   actionKeyStates[glfwKeyToAction[key]] = action;
+   actionKeyStates[ glfwKeyToAction[ key ] ] = action;
 
-   if( key == GLFW_KEY_P && action == GLFW_PRESS )
+   if ( key == GLFW_KEY_P && action == GLFW_PRESS )
    {
       VKPtr->_debugPrintMemoryMgrInfo();
    }
@@ -321,41 +314,40 @@ static void keyCB( GLFWwindow* window, int key, int scancode, int action,
 
 static void pollKeyboard( GLFWwindow* window )
 {
-   if( actionKeyStates[KeyAction::MOVE_FORWARD] > 0 )
+   if ( actionKeyStates[ KeyAction::MOVE_FORWARD ] > 0 )
    {
-      actionKeyStates[KeyAction::MOVE_FORWARD] = GLFW_REPEAT;
+      actionKeyStates[ KeyAction::MOVE_FORWARD ] = GLFW_REPEAT;
       cam.setPos( cam.getPos() - cam.getForward() * 0.01f );
    }
-   else if( actionKeyStates[KeyAction::MOVE_BACKWARD] > 0 )
+   else if ( actionKeyStates[ KeyAction::MOVE_BACKWARD ] > 0 )
    {
-      actionKeyStates[KeyAction::MOVE_BACKWARD] = GLFW_REPEAT;
+      actionKeyStates[ KeyAction::MOVE_BACKWARD ] = GLFW_REPEAT;
       cam.setPos( cam.getPos() + cam.getForward() * 0.01f );
    }
 
-   if( actionKeyStates[KeyAction::STRAFE_LEFT] > 0 )
+   if ( actionKeyStates[ KeyAction::STRAFE_LEFT ] > 0 )
    {
-      actionKeyStates[KeyAction::STRAFE_LEFT] = GLFW_REPEAT;
+      actionKeyStates[ KeyAction::STRAFE_LEFT ] = GLFW_REPEAT;
       cam.setPos( cam.getPos() - cam.getRight() * 0.01f );
    }
-   else if( actionKeyStates[KeyAction::STRAFE_RIGHT] > 0 )
+   else if ( actionKeyStates[ KeyAction::STRAFE_RIGHT ] > 0 )
    {
-      actionKeyStates[KeyAction::STRAFE_RIGHT] = GLFW_REPEAT;
+      actionKeyStates[ KeyAction::STRAFE_RIGHT ] = GLFW_REPEAT;
       cam.setPos( cam.getPos() + cam.getRight() * 0.01f );
    }
 
-   if( actionKeyStates[KeyAction::EXIT] == GLFW_PRESS )
+   if ( actionKeyStates[ KeyAction::EXIT ] == GLFW_PRESS )
    {
       glfwSetWindowShouldClose( window, GLFW_TRUE );
-      actionKeyStates[KeyAction::EXIT] = GLFW_REPEAT;
+      actionKeyStates[ KeyAction::EXIT ] = GLFW_REPEAT;
    }
 
-   if( actionKeyStates[KeyAction::TOGGLE_MOUSE_CAPTURE] == GLFW_PRESS )
+   if ( actionKeyStates[ KeyAction::TOGGLE_MOUSE_CAPTURE ] == GLFW_PRESS )
    {
       const auto mode = glfwGetInputMode( window, GLFW_CURSOR );
       glfwSetInputMode( window, GLFW_CURSOR,
-                        mode == GLFW_CURSOR_DISABLED ? GLFW_CURSOR_NORMAL
-                                                     : GLFW_CURSOR_DISABLED );
-      actionKeyStates[KeyAction::TOGGLE_MOUSE_CAPTURE] = GLFW_REPEAT;
+                        mode == GLFW_CURSOR_DISABLED ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED );
+      actionKeyStates[ KeyAction::TOGGLE_MOUSE_CAPTURE ] = GLFW_REPEAT;
    }
 }
 
@@ -370,8 +362,7 @@ int main()
 
    std::vector<Vertex> vertices;
    std::vector<uint32_t> indices;
-   auto done =
-       loadModel( threadPool, "../models/armadillo.obj", &vertices, &indices );
+   auto done = loadModel( threadPool, "../models/armadillo.obj", &vertices, &indices );
    // auto done = loadModel(threadPool, "../models/crate.obj", &vertices,
    // &indices);
 
@@ -384,8 +375,7 @@ int main()
    const char** glfwExtensions;
    glfwExtensions = glfwGetRequiredInstanceExtensions( &glfwExtensionCount );
    std::vector<const char*> extensions( glfwExtensionCount );
-   std::copy( glfwExtensions, glfwExtensions + glfwExtensionCount,
-              extensions.begin() );
+   std::copy( glfwExtensions, glfwExtensions + glfwExtensionCount, extensions.begin() );
 
    VulkanGraphic VK( extensions );
    initVulkan( VK, window );
@@ -403,19 +393,16 @@ int main()
 
    UniformBufferObject ubo = {};
 
-   char windowTitle[WINDOW_TITLE_SIZE] = {};
+   char windowTitle[ WINDOW_TITLE_SIZE ] = {};
    auto simStartTime = std::chrono::steady_clock::now();
    auto nextFpsPrintTime = 1s;
    unsigned frameRendered = 0;
 
-   cam.setExtent( VK.getSwapChain()->_curExtent.width,
-                  VK.getSwapChain()->_curExtent.height );
+   cam.setExtent( VK.getSwapChain()->_curExtent.width, VK.getSwapChain()->_curExtent.height );
    bool modelLoaded = false;
-   while( !glfwWindowShouldClose( window ) )
+   while ( !glfwWindowShouldClose( window ) )
    {
-      if( !modelLoaded &&
-          done.wait_for( std::chrono::seconds( 0 ) ) ==
-              std::future_status::ready )
+      if ( !modelLoaded && done.wait_for( std::chrono::seconds( 0 ) ) == std::future_status::ready )
       {
          VK.createVertexBuffer( vertices );
          VK.createIndexBuffer( indices );
@@ -427,14 +414,13 @@ int main()
       pollKeyboard( window );
       updateUBO( cam, ubo );
       VK.updateUBO( ubo );
-      // std::cout << ptr() << std::endl;
+      //// std::cout << ptr() << std::endl;
       VK.render();
 
       ++frameRendered;
-      if( std::chrono::steady_clock::now() - simStartTime > nextFpsPrintTime )
+      if ( std::chrono::steady_clock::now() - simStartTime > nextFpsPrintTime )
       {
-         std::snprintf( windowTitle, WINDOW_TITLE_SIZE, "MVP - %i FPS",
-                        frameRendered );
+         std::snprintf( windowTitle, WINDOW_TITLE_SIZE, "MVP - %i FPS", frameRendered );
          glfwSetWindowTitle( window, windowTitle );
          frameRendered = 0;
          nextFpsPrintTime += 1s;

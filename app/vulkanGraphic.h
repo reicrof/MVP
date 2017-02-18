@@ -36,15 +36,13 @@ class VulkanGraphic
    bool createLogicalDevice();
    bool createSurface( GLFWwindow* window );
    bool createSwapChain();
-   bool createMemoryPool();
    bool createRenderPass();
-   bool createWidgetRenderPass();
    bool createPipelineCache();
    bool createPipeline();
    bool createFrameBuffers();
    bool createCommandPool();
    bool createDescriptorPool();
-   bool createCommandBuffers();
+   VkCommandBuffer createCommandBuffers( unsigned frameIdx );
    bool createSemaphores();
    bool createVertexBuffer( const std::vector<Vertex>& vertices );
    bool createIndexBuffer( const std::vector<uint32_t>& indices );
@@ -55,7 +53,6 @@ class VulkanGraphic
    bool createTextureImageView();
    bool createTextureSampler();
    bool createDepthImage();
-   // bool loadModel(const std::string& path);
    void updateUBO( const UniformBufferObject& ubo );
 
    void render();
@@ -78,6 +75,7 @@ class VulkanGraphic
                            VkDeviceSize size,
                            VkBufferUsageFlags usage,
                            VDeleter<VkBuffer>& buffer );
+   void freeBuffer( VMemAlloc& alloc );
 
    void createImage( uint32_t width,
                      uint32_t height,
@@ -95,28 +93,30 @@ class VulkanGraphic
    VkPhysicalDevice _physDevice;
    Queue _graphicQueue;
    Queue _presentationQueue;
+   Queue _transferQueue;
    VDeleter<VkSurfaceKHR> _surface{_instance, vkDestroySurfaceKHR};
    std::unique_ptr<SwapChain> _swapChain;
    VDeleter<VkRenderPass> _renderPass{_device, vkDestroyRenderPass};
    VDeleter<VkRenderPass> _widgetRenderPass{_device, vkDestroyRenderPass};
    VDeleter<VkDescriptorSetLayout> _descriptorSetLayout{_device, vkDestroyDescriptorSetLayout};
-   VDeleter<VkPipelineCache>  _pipelineCache{ _device, vkDestroyPipelineCache };
+   VDeleter<VkPipelineCache> _pipelineCache{_device, vkDestroyPipelineCache};
    VDeleter<VkPipelineLayout> _pipelineLayout{_device, vkDestroyPipelineLayout};
    VDeleter<VkPipeline> _graphicsPipeline{_device, vkDestroyPipeline};
    VDeleter<VkPipelineLayout> _widgetPipelineLayout{_device, vkDestroyPipelineLayout};
    VDeleter<VkPipeline> _graphicsWidgetPipeline{_device, vkDestroyPipeline};
    std::vector<VDeleter<VkFramebuffer>> _framebuffers;
-   VDeleter<VkCommandPool> _commandPool{_device, vkDestroyCommandPool};
-   VCommandPool _singleTimeCommandPool{_device, 100};
-   std::vector<VkCommandBuffer> _commandBuffers;
+   std::vector<VCommandPool> _frameCommandPools;
+   VCommandPool _singleTimeGraphicCommandPool;
+   VCommandPool _singleTimeTransferCommandPool;
    VDeleter<VkDescriptorPool> _descriptorPool{_device, vkDestroyDescriptorPool};
    VkDescriptorSet _descriptorSet;
 
    VDeleter<VkSemaphore> _imageAvailableSemaphore{_device, vkDestroySemaphore};
    VDeleter<VkSemaphore> _renderFinishedSemaphore{_device, vkDestroySemaphore};
+   VDeleter<VkSemaphore> _uboUpdatedSemaphore{_device, vkDestroySemaphore};
 
    VDeleter<VkFence> _uboUpdatedFence{_device, vkDestroyFence};
-   VkCommandBuffer* _uboUpdateCmdBuf;
+   VkCommandBuffer _uboUpdateCmdBuf;
 
    VDeleter<VkBuffer> _vertexBuffer{_device, vkDestroyBuffer};
    VDeleter<VkBuffer> _indexBuffer{_device, vkDestroyBuffer};

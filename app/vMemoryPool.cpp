@@ -95,23 +95,23 @@ VMemoryManager::VMemoryManager( const VkPhysicalDevice& physDevice,
 VMemAlloc VMemoryManager::alloc( const VkMemoryRequirements& requirements,
                                  const VkMemoryPropertyFlags& properties )
 {
-   PoolsType curType{ requirements, properties };
-   std::vector< std::unique_ptr<VMemoryPool> >* validPools = nullptr;
+   PoolsType curType{requirements, properties};
+   std::vector<std::unique_ptr<VMemoryPool> >* validPools = nullptr;
    for ( size_t i = 0; i < _poolsProperties.size(); ++i )
    {
       if ( curType == _poolsProperties[ i ] )
       {
-        // We have found the list of pools that are valid with requested alloc
-        validPools = &_pools[i];
-        uint64_t allocOffset = MemoryPool::INVALID_OFFSET;
-        for (size_t j = 0; j < validPools->size(); ++j)
-        {
-           allocOffset = (*validPools)[j]->alloc(requirements.size, requirements.alignment);
-           if (allocOffset != MemoryPool::INVALID_OFFSET) 
-           {
-              return VMemAlloc{ *(*validPools)[j], allocOffset };
-           }
-        }
+         // We have found the list of pools that are valid with requested alloc
+         validPools = &_pools[ i ];
+         uint64_t allocOffset = MemoryPool::INVALID_OFFSET;
+         for ( size_t j = 0; j < validPools->size(); ++j )
+         {
+            allocOffset = ( *validPools )[ j ]->alloc( requirements.size, requirements.alignment );
+            if ( allocOffset != MemoryPool::INVALID_OFFSET )
+            {
+               return VMemAlloc{*( *validPools )[ j ], allocOffset};
+            }
+         }
       }
    }
 
@@ -119,31 +119,33 @@ VMemAlloc VMemoryManager::alloc( const VkMemoryRequirements& requirements,
 
    // If no pools satisfies the type required, create new list of pools
    VMemoryPool* pool = nullptr;
-   if (!validPools)
+   if ( !validPools )
    {
-      // Creates a new list of pool, with a first pool containing enough space to allocate 4 times the requested amount.
+      // Creates a new list of pool, with a first pool containing enough space to allocate 4 times
+      // the requested amount.
       _pools.emplace_back();
-      _pools.back().emplace_back(std::make_unique<VMemoryPool>(requirements.size * 4, _physDevice, _device,
-         requirements.memoryTypeBits, properties));
+      _pools.back().emplace_back( std::make_unique<VMemoryPool>(
+         requirements.size * 4, _physDevice, _device, requirements.memoryTypeBits, properties ) );
 
       // Add the new pool properties to the list property.
-      _poolsProperties.emplace_back(requirements, properties);
+      _poolsProperties.emplace_back( requirements, properties );
       pool = _pools.back().back().get();
    }
    else
    {
-      // There is already a list of pools satisfying the required types. We need more memory of this type.
+      // There is already a list of pools satisfying the required types. We need more memory of this
+      // type.
       // Lets create a new pool, doubling the size of the previous pool.
-      const uint64_t newSize = std::max( validPools->back()->totalSize() * 2, requirements.size * 4 );
-      validPools->emplace_back(std::unique_ptr<VMemoryPool >{ std::make_unique<VMemoryPool>(newSize, _physDevice, _device,
-         requirements.memoryTypeBits, properties) });
+      const uint64_t newSize =
+         std::max( validPools->back()->totalSize() * 2, requirements.size * 4 );
+      validPools->emplace_back( std::unique_ptr<VMemoryPool>{std::make_unique<VMemoryPool>(
+         newSize, _physDevice, _device, requirements.memoryTypeBits, properties )} );
       pool = validPools->back().get();
    }
 
-   assert(pool);
+   assert( pool );
 
-   return VMemAlloc{ *pool, pool->alloc(requirements.size, requirements.alignment) };
-
+   return VMemAlloc{*pool, pool->alloc( requirements.size, requirements.alignment )};
 }
 
 void VMemoryManager::free( VMemAlloc& alloc )
@@ -152,13 +154,13 @@ void VMemoryManager::free( VMemAlloc& alloc )
    bool allocFreed = false;
 #endif
 
-   for (auto& poolList : _pools)
+   for ( auto& poolList : _pools )
    {
-      for (auto& pool : poolList)
+      for ( auto& pool : poolList )
       {
-         if (*pool.get() == alloc.memory)
+         if ( *pool.get() == alloc.memory )
          {
-            pool->free(alloc);
+            pool->free( alloc );
 #ifdef _DEBUG
             allocFreed = true;
 #endif
@@ -167,7 +169,7 @@ void VMemoryManager::free( VMemAlloc& alloc )
    }
 
 #ifdef _DEBUG
-   assert(allocFreed);
+   assert( allocFreed );
 #endif
 }
 
@@ -175,13 +177,13 @@ void VMemoryManager::free( VMemAlloc& alloc )
 void VMemoryManager::_debugPrint() const
 {
    using namespace std;
-   for( size_t i = 0; i < _poolsProperties.size(); ++i )
+   for ( size_t i = 0; i < _poolsProperties.size(); ++i )
    {
-      cout << "Properties : " << _poolsProperties[i]._properties
-           << " | Mem Type bits : " << _poolsProperties[i]._memTypeBits << endl;
-      for (const auto& pool : _pools[i])
+      cout << "Properties : " << _poolsProperties[ i ]._properties
+           << " | Mem Type bits : " << _poolsProperties[ i ]._memTypeBits << endl;
+      for ( const auto& pool : _pools[ i ] )
       {
-         cout << pool->_debugPrint(80, ' ', '=' ) << '\n';
+         cout << pool->_debugPrint( 80, ' ', '=' ) << '\n';
       }
    }
 }

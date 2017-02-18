@@ -1,42 +1,42 @@
 #include "MemoryPool.h"
 
-MemoryPool::MemoryPool(uint64_t size, uint64_t maxAllocCount /*=200*/) : _poolSize(size), _freeSpace(size)
+MemoryPool::MemoryPool( uint64_t size, uint64_t maxAllocCount /*=200*/ )
+    : _poolSize( size ), _freeSpace( size )
 {
-   _allocatedChunks.reserve(maxAllocCount);
+   _allocatedChunks.reserve( maxAllocCount );
    // Create first default free chunk
-   _allocatedChunks.emplace_back(size, 0);
+   _allocatedChunks.emplace_back( size, 0 );
 }
 
-uint64_t MemoryPool::alloc(uint64_t size, uint64_t alignment)
+uint64_t MemoryPool::alloc( uint64_t size, uint64_t alignment )
 {
    // Alignment needs to be a power of two.
-   assert((alignment != 0) && !(alignment & (alignment - 1)));
+   assert( ( alignment != 0 ) && !( alignment & ( alignment - 1 ) ) );
 
    // Get the first free chunk that can contains the requested allocation
    const auto endIt = _allocatedChunks.cend();
    const uint64_t alignmentMask = alignment - 1;
    auto it =
-      std::find_if(_allocatedChunks.begin(), _allocatedChunks.end(), [=](const auto& chunk) {
-      // Get padding requirement for chunk. Equivalent of : ceil( cur / align ) * align
-      // plus its size
-      return chunk.isFree &&
-         chunk.size >=
-         (alignment - ((chunk.offset & alignmentMask)) & alignmentMask) + size;
-   });
-   
-   if (it == endIt)
+      std::find_if( _allocatedChunks.begin(), _allocatedChunks.end(), [=]( const auto& chunk ) {
+         // Get padding requirement for chunk. Equivalent of : ceil( cur / align ) * align
+         // plus its size
+         return chunk.isFree &&
+                chunk.size >=
+                   ( alignment - ( ( chunk.offset & alignmentMask ) ) & alignmentMask ) + size;
+      } );
+
+   if ( it == endIt )
    {
       // Out of space, cannot allocate.
       return INVALID_OFFSET;
    }
 
-   const uint64_t alignmentPadding =
-      (alignment - (it->offset & alignmentMask)) & alignmentMask;
+   const uint64_t alignmentPadding = ( alignment - ( it->offset & alignmentMask ) ) & alignmentMask;
 
    // The free chunk becomes the new allocated chunk. The remaining space is
    // splitted to create a new free chunk.
    const uint64_t previousFreeSize = it->size;
-   if (it != _allocatedChunks.begin())
+   if ( it != _allocatedChunks.begin() )
    {
       auto prevIt = it - 1;
       // We give the alignment offset to the previous chunk
@@ -46,7 +46,7 @@ uint64_t MemoryPool::alloc(uint64_t size, uint64_t alignment)
 
       // We gave the space to the previous chunk. If it was used,
       // we need to adjust the remaining free space.
-      if (!prevIt->isFree)
+      if ( !prevIt->isFree )
       {
          _freeSpace -= alignmentPadding;
       }
@@ -57,11 +57,11 @@ uint64_t MemoryPool::alloc(uint64_t size, uint64_t alignment)
    it->size = size;
 
    // Append leftover memory the the next chunk or create a new free chunk if none exists.
-   if (previousFreeSize > alignmentPadding + size)
+   if ( previousFreeSize > alignmentPadding + size )
    {
       const uint64_t leftOverMem = previousFreeSize - alignmentPadding - size;
       const auto itNextChunk = it + 1;
-      if (itNextChunk != endIt && itNextChunk->isFree)
+      if ( itNextChunk != endIt && itNextChunk->isFree )
       {
          itNextChunk->size += leftOverMem;
          itNextChunk->offset -= leftOverMem;
@@ -69,29 +69,29 @@ uint64_t MemoryPool::alloc(uint64_t size, uint64_t alignment)
       else
       {
          // Vector will be reallocated. You should increase the starting capacity.
-         assert(_allocatedChunks.capacity() >= _allocatedChunks.size());
-         it = --_allocatedChunks.insert(it + 1, AllocChunk{ leftOverMem, it->offset + size });
+         assert( _allocatedChunks.capacity() >= _allocatedChunks.size() );
+         it = --_allocatedChunks.insert( it + 1, AllocChunk{leftOverMem, it->offset + size} );
       }
    }
 
    _freeSpace -= size;
 
 #ifdef _DEBUG
-   assert(_debugIsConform());
+   assert( _debugIsConform() );
 #endif  // DEBUG
 
    return it->offset;
 }
 
-void MemoryPool::free(uint64_t offset)
+void MemoryPool::free( uint64_t offset )
 {
    // Find the chunk
    auto it =
-      std::lower_bound(_allocatedChunks.begin(), _allocatedChunks.end(), offset,
-         [](const AllocChunk& lhs, uint64_t val) { return lhs.offset < val; });
+      std::lower_bound( _allocatedChunks.begin(), _allocatedChunks.end(), offset,
+                        []( const AllocChunk& lhs, uint64_t val ) { return lhs.offset < val; } );
 
    // Unknown chunk or already freed chunk
-   assert(it != _allocatedChunks.end() && !it->isFree);
+   assert( it != _allocatedChunks.end() && !it->isFree );
 
    // Current chunk is now free.
    it->isFree = true;
@@ -101,34 +101,34 @@ void MemoryPool::free(uint64_t offset)
    // Try to merge the freed chunk with the one on the left and the right.
    // Merge right if not last chunk and if next chunk exists.
    const bool mergeRight =
-      it != _allocatedChunks.end() && (it + 1) != _allocatedChunks.end() && (it + 1)->isFree;
+      it != _allocatedChunks.end() && ( it + 1 ) != _allocatedChunks.end() && ( it + 1 )->isFree;
    // Merge left if not first chunk and if previous chunk exists.
    const bool mergeLeft = it != _allocatedChunks.begin() &&
-      (it - 1) != _allocatedChunks.begin() && (it - 1)->isFree;
+                          ( it - 1 ) != _allocatedChunks.begin() && ( it - 1 )->isFree;
 
-   std::vector<AllocChunk>::iterator itToRemoves[2] = { it, it };
-   if (mergeRight)
+   std::vector<AllocChunk>::iterator itToRemoves[ 2 ] = {it, it};
+   if ( mergeRight )
    {
       const auto nextIt = it + 1;
       nextIt->size += it->size;
       nextIt->offset -= it->size;
       it = nextIt;  // The current block is now the next one merged.
    }
-   if (mergeLeft)
+   if ( mergeLeft )
    {
       auto prevIt = it - 1;
-      if (mergeRight)
+      if ( mergeRight )
          --prevIt;
       prevIt->size += it->size;
    }
 
    // Since we always merge to the left, we remove the chunk to
    // the right, according to the number of merge done.
-   itToRemoves[1] += (mergeLeft + mergeRight);
-   _allocatedChunks.erase(itToRemoves[0], itToRemoves[1]);
+   itToRemoves[ 1 ] += ( mergeLeft + mergeRight );
+   _allocatedChunks.erase( itToRemoves[ 0 ], itToRemoves[ 1 ] );
 
 #ifdef _DEBUG
-   assert(_debugIsConform());
+   assert( _debugIsConform() );
 #endif  // DEBUG
 }
 
@@ -139,53 +139,56 @@ bool MemoryPool::_debugIsConform() const
    bool totalSizeMatch = true;
    uint64_t totalSize = 0;
    uint64_t freeSpace = 0;
-   for (auto it = _allocatedChunks.begin(); it != _allocatedChunks.end(); ++it)
+   for ( auto it = _allocatedChunks.begin(); it != _allocatedChunks.end(); ++it )
    {
       isConform &= it->offset == totalSize;
       totalSize += it->size;
-      if (it->isFree)
+      if ( it->isFree )
       {
          freeSpace += it->size;
       }
-      assert(isConform);
+      assert( isConform );
    }
 
    totalSizeMatch = totalSize == _poolSize;
-   assert(totalSizeMatch);
+   assert( totalSizeMatch );
 
    freeSpaceMatch = freeSpace == _freeSpace;
-   assert(freeSpaceMatch);
+   assert( freeSpaceMatch );
 
    return isConform && totalSizeMatch && freeSpaceMatch;
 }
 
-std::string MemoryPool::_debugPrint(int rangeLength, char emptyChar, char usedChar ) const
+std::string MemoryPool::_debugPrint( int rangeLength, char emptyChar, char usedChar ) const
 {
    assert( rangeLength > 2 );
    std::string msg;
    msg.reserve( rangeLength + 40 );
-   msg.push_back('[');
+   msg.push_back( '[' );
 
-   const int range = rangeLength - 2 - _allocatedChunks.size();
-   const float unitSize = _poolSize / static_cast<float>(range);
+   const float range = static_cast<float>( rangeLength - 2 - _allocatedChunks.size() );
+   const float unitSize = _poolSize / range;
    float curUnit = 0.0f;
    auto it = _allocatedChunks.begin();
-   for (int i = 0; i < range && it != _allocatedChunks.end(); ++i)
+   for ( int i = 0; i < range && it != _allocatedChunks.end(); ++i )
    {
-	   msg.push_back(it->isFree ? emptyChar : usedChar);
-	   curUnit += unitSize;
-	   if (curUnit > it->size)
-	   {
-		   ++it;
-		   if (it != _allocatedChunks.end()) { msg.push_back('|'); }
-	   }
+      msg.push_back( it->isFree ? emptyChar : usedChar );
+      curUnit += unitSize;
+      if ( curUnit > it->size )
+      {
+         ++it;
+         if ( it != _allocatedChunks.end() )
+         {
+            msg.push_back( '|' );
+         }
+      }
    }
 
-   msg.push_back(']');
+   msg.push_back( ']' );
 
-   const float percentUsed = (_poolSize - _freeSpace) / float( _poolSize );
-   std::string stats = " " + std::to_string( percentUsed ) + "% of " +
-                       std::to_string( _poolSize ) + " bytes used";
+   const float percentUsed = ( _poolSize - _freeSpace ) / float( _poolSize );
+   std::string stats =
+      " " + std::to_string( percentUsed ) + "% of " + std::to_string( _poolSize ) + " bytes used";
 
    msg += stats;
    return msg;
