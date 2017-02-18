@@ -216,6 +216,7 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createWidgetRenderPass(), "Cannot create a render pass." );
    VERIFY( VK.createDescriptorSetLayout(),
            "Cannot create descriptor set layout" );
+   VERIFY(VK.createPipelineCache(), "Cannot create pipeline cache.");
    VERIFY( VK.createPipeline(), "Cannot create the pipeline." );
    VERIFY( VK.createCommandPool(), "Cannot create command pool." );
    VERIFY( VK.createTextureImage(), "Cannot create texture" );
@@ -254,6 +255,11 @@ void onMousePos( GLFWwindow* window, double x, double y )
 {
    constexpr double X_SENSITIVITY = 0.002;
    constexpr double Y_SENSITIVITY = 0.002;
+
+   if (glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED)
+   {
+	   return;
+   }
 
    static glm::vec2 startPos( x, y );
 
@@ -434,6 +440,8 @@ int main()
          nextFpsPrintTime += 1s;
       }
    }
+
+   VK.savePipelineCacheToDisk();
 
    threadPool.stop();
 

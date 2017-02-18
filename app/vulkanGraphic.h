@@ -39,6 +39,7 @@ class VulkanGraphic
    bool createMemoryPool();
    bool createRenderPass();
    bool createWidgetRenderPass();
+   bool createPipelineCache();
    bool createPipeline();
    bool createFrameBuffers();
    bool createCommandPool();
@@ -59,6 +60,8 @@ class VulkanGraphic
 
    void render();
    void recreateSwapChain();
+
+   void savePipelineCacheToDisk();
 
    const SwapChain* getSwapChain() const;
 
@@ -97,6 +100,7 @@ class VulkanGraphic
    VDeleter<VkRenderPass> _renderPass{_device, vkDestroyRenderPass};
    VDeleter<VkRenderPass> _widgetRenderPass{_device, vkDestroyRenderPass};
    VDeleter<VkDescriptorSetLayout> _descriptorSetLayout{_device, vkDestroyDescriptorSetLayout};
+   VDeleter<VkPipelineCache>  _pipelineCache{ _device, vkDestroyPipelineCache };
    VDeleter<VkPipelineLayout> _pipelineLayout{_device, vkDestroyPipelineLayout};
    VDeleter<VkPipeline> _graphicsPipeline{_device, vkDestroyPipeline};
    VDeleter<VkPipelineLayout> _widgetPipelineLayout{_device, vkDestroyPipelineLayout};

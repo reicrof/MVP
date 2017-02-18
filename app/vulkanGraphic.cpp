@@ -9,6 +9,7 @@
 #include <vector>
 #include <cstring>
 #include <stdio.h>
+#include <fstream>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -19,6 +20,8 @@
 const std::vector<const char*> VALIDATION_LAYERS = {"VK_LAYER_LUNARG_standard_validation"};
 
 const std::vector<const char*> DEVICE_EXTENSIONS = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+
+constexpr char* PIPELINE_CACHE_FILE_NAME = "PipelineCache.vk";
 
 #ifdef _DEBUG
 const bool enableValidationLayers = true;
@@ -354,6 +357,18 @@ void VulkanGraphic::recreateSwapChain()
    createDepthImage();
    createFrameBuffers();
    createCommandBuffers();
+}
+
+void VulkanGraphic::savePipelineCacheToDisk()
+{
+	size_t size = -1;
+	// Get the size of the cache
+	VK_CALL( vkGetPipelineCacheData(_device, _pipelineCache, &size, nullptr) );
+	std::vector<unsigned char > vecData(size);
+	VK_CALL( vkGetPipelineCacheData(_device, _pipelineCache, &size, vecData.data()) );
+
+	std::ofstream out(PIPELINE_CACHE_FILE_NAME, std::ios::binary);
+	out.write((char*)vecData.data(), size);
 }
 
 VulkanGraphic::VulkanGraphic( std::vector<const char*> instanceExtensions )
@@ -744,6 +759,35 @@ bool VulkanGraphic::createDescriptorSetLayout()
    return true;
 }
 
+bool VulkanGraphic::createPipelineCache()
+{
+	// Try to load from disk fist
+	std::ifstream cachedFile(PIPELINE_CACHE_FILE_NAME, std::ios::binary);
+	if (cachedFile.is_open())
+	{
+		cachedFile.seekg(0, std::ios::end);
+		std::vector<unsigned char> data(cachedFile.tellg());
+		cachedFile.seekg(0, std::ios::beg);
+
+		data.assign((std::istreambuf_iterator<char>(cachedFile)),
+					 std::istreambuf_iterator<char>());
+
+		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
+		pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+		pipelineCacheCreateInfo.pInitialData = data.data();
+		pipelineCacheCreateInfo.initialDataSize = data.size();
+		VK_CALL(vkCreatePipelineCache(_device, &pipelineCacheCreateInfo, nullptr, &_pipelineCache));
+	}
+	else
+	{
+		VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
+		pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+		VK_CALL(vkCreatePipelineCache(_device, &pipelineCacheCreateInfo, nullptr, &_pipelineCache));
+	}
+
+	return true;
+}
+
 bool VulkanGraphic::createPipeline()
 {
    VDeleter<VkShaderModule> vertShaderModule{_device, vkDestroyShaderModule};
@@ -869,7 +913,7 @@ bool VulkanGraphic::createPipeline()
    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
    pipelineInfo.basePipelineIndex = -1;  // Optional
 
-   VK_CALL( vkCreateGraphicsPipelines( _device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+   VK_CALL( vkCreateGraphicsPipelines( _device, _pipelineCache, 1, &pipelineInfo, nullptr,
                                        &_graphicsPipeline ) );
 
    // Create widget pipeline
@@ -900,7 +944,7 @@ bool VulkanGraphic::createPipeline()
 	depthStencil.depthTestEnable = VK_FALSE;
 	pipelineInfo.pDepthStencilState = &depthStencil;
 
-	VK_CALL(vkCreateGraphicsPipelines(_device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+	VK_CALL(vkCreateGraphicsPipelines(_device, _pipelineCache, 1, &pipelineInfo, nullptr,
 		&_graphicsWidgetPipeline));
 
    return true;
