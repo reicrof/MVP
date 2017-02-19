@@ -55,6 +55,7 @@ class VulkanGraphic
    bool createDepthImage();
    void updateUBO( const UniformBufferObject& ubo );
 
+   void onNewFrame();
    void render();
    void recreateSwapChain();
 
@@ -105,9 +106,9 @@ class VulkanGraphic
    VDeleter<VkPipelineLayout> _widgetPipelineLayout{_device, vkDestroyPipelineLayout};
    VDeleter<VkPipeline> _graphicsWidgetPipeline{_device, vkDestroyPipeline};
    std::vector<VDeleter<VkFramebuffer>> _framebuffers;
-   std::vector<VCommandPool> _frameCommandPools;
-   VCommandPool _singleTimeGraphicCommandPool;
-   VCommandPool _singleTimeTransferCommandPool;
+   std::vector<VCommandPool> _graphicCommandPools;
+   std::vector<VCommandPool> _transferCommandPools;
+   VCommandPool _loadCommandPool;
    VDeleter<VkDescriptorPool> _descriptorPool{_device, vkDestroyDescriptorPool};
    VkDescriptorSet _descriptorSet;
 
@@ -142,6 +143,9 @@ class VulkanGraphic
 
    VDeleter<VkDebugReportCallbackEXT> _validationCallback{_instance, DestroyDebugReportCallbackEXT};
    std::unique_ptr<std::ofstream> _outErrorFile;
+
+   uint32_t _curFrameIdx;
+   std::vector<VkFence> _frameRenderedFence;
 };
 
 #endif  // VULKAN_GRAPHIC_H_

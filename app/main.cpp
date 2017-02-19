@@ -400,6 +400,7 @@ int main()
 
    cam.setExtent( VK.getSwapChain()->_curExtent.width, VK.getSwapChain()->_curExtent.height );
    bool modelLoaded = false;
+
    while ( !glfwWindowShouldClose( window ) )
    {
       if ( !modelLoaded && done.wait_for( std::chrono::seconds( 0 ) ) == std::future_status::ready )
@@ -409,12 +410,16 @@ int main()
          VK.recreateSwapChain();
          modelLoaded = true;
       }
+
+      // Grab the next frame to render.
+      VK.onNewFrame();
+
       updateCoreDll();
-      glfwPollEvents();
-      pollKeyboard( window );
       updateUBO( cam, ubo );
       VK.updateUBO( ubo );
       //// std::cout << ptr() << std::endl;
+      glfwPollEvents();
+      pollKeyboard( window );
       VK.render();
 
       ++frameRendered;

@@ -15,8 +15,8 @@ class VCommandPool
               VkCommandPoolCreateFlags flag,
               uint32_t queueFamilyIndex );
    VkCommandBuffer alloc( VkCommandBufferUsageFlagBits flag );
-   void free( VkCommandBuffer& cmdBuffer );
-   void freeAll();
+   void free( VkCommandBuffer& cmdBuffer, VkCommandPoolResetFlags flag = 0 );
+   void freeAll( VkCommandPoolResetFlags flag = 0 );
 
   private:
    void expandCommandBuffers( size_t size );

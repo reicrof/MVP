@@ -46,22 +46,22 @@ VkCommandBuffer VCommandPool::alloc( VkCommandBufferUsageFlagBits flag )
    return _commandBuffers[ cmdBuffIdx ];
 }
 
-void VCommandPool::free( VkCommandBuffer& cmdBuffer )
+void VCommandPool::free( VkCommandBuffer& cmdBuffer, VkCommandPoolResetFlags flag /*= 0*/ )
 {
    for ( size_t i = 0; i < _commandBuffers.size(); ++i )
    {
       if ( _commandBuffers[ i ] == cmdBuffer )
       {
          std::swap( _commandBuffers[ i ], _commandBuffers[ --_nextFreeIdx ] );
-         vkResetCommandBuffer( cmdBuffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT );
+         vkResetCommandBuffer( cmdBuffer, flag );
          return;
       }
    }
 }
 
-void VCommandPool::freeAll()
+void VCommandPool::freeAll( VkCommandPoolResetFlags flag /*= 0*/ )
 {
-   vkResetCommandPool( _device, _commandPool, VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT );
+   vkResetCommandPool( _device, _commandPool, flag );
    _nextFreeIdx = 0;
 }
 

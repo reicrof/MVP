@@ -10,6 +10,7 @@
 #include <cstring>
 #include <stdio.h>
 #include <fstream>
+#include <numeric>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -325,6 +326,7 @@ void VulkanGraphic::recreateSwapChain()
    vkDeviceWaitIdle( _device );
    _swapChain.reset( new SwapChain( _physDevice, _device, _surface, VK_SHARING_MODE_EXCLUSIVE,
                                     _swapChain->_handle ) );
+
    createPipeline();
    createDepthImage();
    createFrameBuffers();
@@ -529,6 +531,7 @@ bool VulkanGraphic::createSurface( GLFWwindow* window )
 bool VulkanGraphic::createSwapChain()
 {
    _swapChain = std::make_unique<SwapChain>( _physDevice, _device, _surface );
+
    return true;
 }
 
@@ -879,36 +882,30 @@ bool VulkanGraphic::createFrameBuffers()
 
 bool VulkanGraphic::createCommandPool()
 {
-   VkCommandPoolCreateInfo graphicPoolInfo = {};
-   graphicPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-   graphicPoolInfo.queueFamilyIndex = _graphicQueue.familyIndex;
-   graphicPoolInfo.flags =
-      0;  // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT or VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-
-   _singleTimeGraphicCommandPool.init( *_device.get(), 5,
-                                       VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                                       _graphicQueue.familyIndex );
-
-   VkCommandPoolCreateInfo transferPoolInfo = {};
-   transferPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-   transferPoolInfo.queueFamilyIndex = _transferQueue.familyIndex;
-   transferPoolInfo.flags =
-      0;  // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT or VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-
-   _singleTimeTransferCommandPool.init( *_device.get(), 5,
-                                        VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                                        _transferQueue.familyIndex );
-
-   // Create one command pool per swapchain image.
+   // Create one graphic command pool per swapchain image.
    VkCommandPoolCreateInfo frameImagePoolInfo = {};
    frameImagePoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
    frameImagePoolInfo.queueFamilyIndex = _graphicQueue.familyIndex;
    frameImagePoolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-   _frameCommandPools.resize( _swapChain->_imageCount );
-   for ( auto& p : _frameCommandPools )
+   _graphicCommandPools.resize( _swapChain->_imageCount );
+   for ( auto& p : _graphicCommandPools )
    {
       p.init( *_device.get(), 5, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, _graphicQueue.familyIndex );
    }
+
+   // Create one transfer command pool per swapchain image.
+   VkCommandPoolCreateInfo transferPoolInfo = {};
+   transferPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+   transferPoolInfo.queueFamilyIndex = _transferQueue.familyIndex;
+   transferPoolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+   _transferCommandPools.resize( _swapChain->_imageCount );
+   for ( auto& p : _transferCommandPools )
+   {
+      p.init( *_device.get(), 5, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, _transferQueue.familyIndex );
+   }
+
+   _loadCommandPool.init( *_device.get(), 10, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+                          _transferQueue.familyIndex );
 
    return true;
 }
@@ -1052,11 +1049,8 @@ void VulkanGraphic::createImage( uint32_t width,
 
 VkCommandBuffer VulkanGraphic::createCommandBuffers( unsigned frameIdx )
 {
-   _frameCommandPools[ frameIdx ].freeAll();
    VkCommandBuffer commandBuffer =
-      _frameCommandPools[ frameIdx ].alloc( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
-
-
+      _graphicCommandPools[ frameIdx ].alloc( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
 
    VkRenderPassBeginInfo renderPassInfo = {};
    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1127,6 +1121,17 @@ bool VulkanGraphic::createSemaphores()
    VK_CALL( vkCreateSemaphore( _device, &semaphoreInfo, nullptr, &_renderFinishedSemaphore ) );
    VK_CALL( vkCreateSemaphore( _device, &semaphoreInfo, nullptr, &_uboUpdatedSemaphore ) );
 
+   VkFenceCreateInfo createInfo = {};
+   createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+   createInfo.pNext = nullptr;
+   createInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+   _frameRenderedFence.resize( _swapChain->_imageCount );
+   for ( size_t i = 0; i < _swapChain->_imageCount; ++i )
+   {
+      vkCreateFence( _device, &createInfo, nullptr, &_frameRenderedFence[ i ] );
+   }
+
    return true;
 }
 
@@ -1149,13 +1154,12 @@ bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
                  _vertexBuffer );
 
    VkCommandBuffer cmd = copyBuffer( stagingBuffer, _vertexBuffer, bufferSize, _device,
-                                     _singleTimeTransferCommandPool, _transferQueue.handle );
+                                     _transferCommandPools[ _curFrameIdx ], _transferQueue.handle );
 
    _verticesCount = static_cast<uint32_t>( vertices.size() );
 
    vkDeviceWaitIdle( _device );
    freeBuffer( hostBuffer );
-   _singleTimeTransferCommandPool.free( cmd );
 
    return true;
 }
@@ -1178,13 +1182,12 @@ bool VulkanGraphic::createIndexBuffer( const std::vector<uint32_t>& indices )
                  _indexBuffer );
 
    VkCommandBuffer cmd = copyBuffer( stagingBuffer, _indexBuffer, bufferSize, _device,
-                                     _singleTimeTransferCommandPool, _transferQueue.handle );
+                                     _transferCommandPools[ _curFrameIdx ], _transferQueue.handle );
 
    _indexCount = static_cast<uint32_t>( indices.size() );
 
    vkDeviceWaitIdle( _device );
    freeBuffer( hostBuffer );
-   _singleTimeTransferCommandPool.free( cmd );
 
    return true;
 }
@@ -1229,17 +1232,18 @@ bool VulkanGraphic::createTextureImage()
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _textureImage );
 
    transitionImageLayout( _stagingImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED,
-                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _device,
-                          _singleTimeGraphicCommandPool, _graphicQueue.handle );
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _device, _loadCommandPool,
+                          _transferQueue.handle );
    transitionImageLayout( _textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _device,
-                          _singleTimeGraphicCommandPool, _graphicQueue.handle );
-   copyImage( _stagingImage, _textureImage, width, height, _device, _singleTimeGraphicCommandPool,
-              _graphicQueue.handle );
-   transitionImageLayout( _textureImage, VK_FORMAT_R8G8B8A8_UNORM,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _device,
-                          _singleTimeGraphicCommandPool, _graphicQueue.handle );
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _device, _loadCommandPool,
+                          _transferQueue.handle );
+   copyImage( _stagingImage, _textureImage, width, height, _device, _loadCommandPool,
+              _transferQueue.handle );
+   transitionImageLayout(
+      _textureImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _device, _loadCommandPool, _transferQueue.handle );
+
+   vkDeviceWaitIdle( _device );
 
    return true;
 }
@@ -1286,8 +1290,9 @@ bool VulkanGraphic::createDepthImage()
 
    transitionImageLayout( _depthImage, VK_FORMAT_D32_SFLOAT, VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, _device,
-                          _singleTimeGraphicCommandPool, _graphicQueue.handle );
+                          _loadCommandPool, _transferQueue.handle );
 
+   vkDeviceWaitIdle( _device );
    return true;
 }
 
@@ -1299,26 +1304,30 @@ void VulkanGraphic::updateUBO( const UniformBufferObject& ubo )
    memcpy( data, &ubo, sizeof( ubo ) );
    vkUnmapMemory( _device, _uniformStagingBufferMemory.memory );
 
-   if ( _uboUpdateCmdBuf != nullptr )
-   {
-      vkDeviceWaitIdle( _device );
-      _singleTimeTransferCommandPool.free( _uboUpdateCmdBuf );
-   }
    _uboUpdateCmdBuf = copyBuffer( _uniformStagingBuffer, _uniformBuffer, sizeof( ubo ), _device,
-                                  _singleTimeTransferCommandPool, _transferQueue.handle, 0, nullptr,
-                                  1, _uboUpdatedSemaphore.get() );
+                                  _transferCommandPools[ _curFrameIdx ], _transferQueue.handle, 0,
+                                  nullptr, 1, _uboUpdatedSemaphore.get() );
+}
+
+void VulkanGraphic::onNewFrame()
+{
+   // Acquire the next image from the swap chain
+   VkResult res =
+      vkAcquireNextImageKHR( _device, _swapChain->_handle, std::numeric_limits<uint64_t>::max(),
+                             _imageAvailableSemaphore, VK_NULL_HANDLE, &_curFrameIdx );
+   recreateSwapChainIfNotValid( res );
+
+   VK_CALL( vkWaitForFences( _device, 1, &_frameRenderedFence[ _curFrameIdx ], VK_FALSE, 1000 ) );
+   vkResetFences( _device, 1, &_frameRenderedFence[ _curFrameIdx ] );
+
+   _transferCommandPools[ _curFrameIdx ].freeAll( VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT );
+   _graphicCommandPools[ _curFrameIdx ].freeAll( VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT );
 }
 
 void VulkanGraphic::render()
 {
-   // Acquire the next image from the swap chain
-   uint32_t imageIndex;
-   VkResult res =
-      vkAcquireNextImageKHR( _device, _swapChain->_handle, std::numeric_limits<uint64_t>::max(),
-                             _imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex );
-   recreateSwapChainIfNotValid( res );
-
-   VkCommandBuffer commandBuffer = createCommandBuffers( imageIndex );
+   const uint32_t frameIdx = _curFrameIdx;
+   VkCommandBuffer commandBuffer = createCommandBuffers( frameIdx );
 
    VkSubmitInfo submitInfo = {};
    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1336,7 +1345,8 @@ void VulkanGraphic::render()
    submitInfo.signalSemaphoreCount = 1;
    submitInfo.pSignalSemaphores = renderingFinisehdSemaphore;
 
-   VK_CALL( vkQueueSubmit( _graphicQueue.handle, 1, &submitInfo, VK_NULL_HANDLE ) );
+   VK_CALL(
+      vkQueueSubmit( _graphicQueue.handle, 1, &submitInfo, _frameRenderedFence[ frameIdx ] ) );
 
    VkPresentInfoKHR presentInfo = {};
    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1347,10 +1357,10 @@ void VulkanGraphic::render()
    VkSwapchainKHR swapChains[] = {_swapChain->_handle};
    presentInfo.swapchainCount = 1;
    presentInfo.pSwapchains = swapChains;
-   presentInfo.pImageIndices = &imageIndex;
+   presentInfo.pImageIndices = &frameIdx;
    presentInfo.pResults = nullptr;
 
-   res = vkQueuePresentKHR( _presentationQueue.handle, &presentInfo );
+   VkResult res = vkQueuePresentKHR( _presentationQueue.handle, &presentInfo );
    recreateSwapChainIfNotValid( res );
 }
 
@@ -1367,4 +1377,10 @@ void VulkanGraphic::_debugPrintMemoryMgrInfo() const
 VulkanGraphic::~VulkanGraphic()
 {
    vkDeviceWaitIdle( _device );
+
+   // Free the frame fences
+   for ( auto& f : _frameRenderedFence )
+   {
+      vkDestroyFence( _device, f, nullptr );
+   }
 }
