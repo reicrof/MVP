@@ -224,6 +224,7 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createDescriptorPool(), "Cannot create descriptor pool." );
    VERIFY( VK.createDescriptorSet(), "Cannot create descriptor set." );
    VERIFY( VK.createSemaphores(), "Cannot create semaphores." );
+   VERIFY(VK.createThreadResources(), "Cannot create thread resources.");
 }
 
 void updateUBO( const Camera& cam, UniformBufferObject& ubo )

@@ -519,6 +519,12 @@ bool VulkanGraphic::createLogicalDevice()
    vkGetDeviceQueue( _device, _presentationQueue.familyIndex, 0, &_presentationQueue.handle );
    vkGetDeviceQueue( _device, _transferQueue.familyIndex, 0, &_transferQueue.handle );
 
+   auto& r = _thread.getThreadResources();
+   r._graphicQueueFamilly = _graphicQueue.familyIndex;
+   r._transferQueueFamilly = _transferQueue.familyIndex;
+   vkGetDeviceQueue(_device, _graphicQueue.familyIndex, 0, &r._graphicQueue);
+   vkGetDeviceQueue(_device, _transferQueue.familyIndex, 0, &r._transferQueue);
+
    return true;
 }
 
@@ -1153,7 +1159,7 @@ bool VulkanGraphic::createVertexBuffer( const std::vector<Vertex>& vertices )
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                  _vertexBuffer );
 
-   VkCommandBuffer cmd = copyBuffer( stagingBuffer, _vertexBuffer, bufferSize, _device,
+   copyBuffer( stagingBuffer, _vertexBuffer, bufferSize, _device,
                                      _transferCommandPools[ _curFrameIdx ], _transferQueue.handle );
 
    _verticesCount = static_cast<uint32_t>( vertices.size() );
@@ -1181,7 +1187,7 @@ bool VulkanGraphic::createIndexBuffer( const std::vector<uint32_t>& indices )
                  VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                  _indexBuffer );
 
-   VkCommandBuffer cmd = copyBuffer( stagingBuffer, _indexBuffer, bufferSize, _device,
+   copyBuffer( stagingBuffer, _indexBuffer, bufferSize, _device,
                                      _transferCommandPools[ _curFrameIdx ], _transferQueue.handle );
 
    _indexCount = static_cast<uint32_t>( indices.size() );
@@ -1190,6 +1196,12 @@ bool VulkanGraphic::createIndexBuffer( const std::vector<uint32_t>& indices )
    freeBuffer( hostBuffer );
 
    return true;
+}
+
+void VulkanGraphic::addGeom(VThread::VThreadResources* resources,
+	const std::vector<Vertex>& vertices,
+	const std::vector<uint32_t>& indices)
+{
 }
 
 bool VulkanGraphic::createUniformBuffer()
@@ -1294,6 +1306,12 @@ bool VulkanGraphic::createDepthImage()
 
    vkDeviceWaitIdle( _device );
    return true;
+}
+
+bool VulkanGraphic::createThreadResources()
+{
+	_thread.init(_physDevice, _device);
+	return true;
 }
 
 void VulkanGraphic::updateUBO( const UniformBufferObject& ubo )

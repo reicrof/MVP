@@ -8,6 +8,7 @@
 #include "vMemoryPool.h"
 #include "vImage.h"
 #include "vCommandPool.h"
+#include "vThread.h"
 #include <fstream>
 #include <memory>
 #include <vector>
@@ -53,6 +54,12 @@ class VulkanGraphic
    bool createTextureImageView();
    bool createTextureSampler();
    bool createDepthImage();
+   bool createThreadResources();
+
+   void addGeom(VThread::VThreadResources* resources,
+	   const std::vector<Vertex>& vertices,
+	   const std::vector<uint32_t>& indices);
+
    void updateUBO( const UniformBufferObject& ubo );
 
    void onNewFrame();
@@ -146,6 +153,8 @@ class VulkanGraphic
 
    uint32_t _curFrameIdx;
    std::vector<VkFence> _frameRenderedFence;
+
+   VThread _thread;
 };
 
 #endif  // VULKAN_GRAPHIC_H_

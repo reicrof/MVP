@@ -35,7 +35,7 @@ uint32_t findMemoryType( uint32_t typeFilter,
 
 VMemoryPool::VMemoryPool( uint64_t size,
                           const VkPhysicalDevice& physDevice,
-                          const VDeleter<VkDevice>& device,
+                          const VkDevice& device,
                           uint32_t memTypeMask,
                           VkMemoryPropertyFlags type,
                           uint64_t maxAllocCount /*= 200*/ )
@@ -86,10 +86,21 @@ VMemoryPool::operator VkDeviceMemory()
 
 ////////////////////////////////////////
 
+VMemoryManager::VMemoryManager() :_physDevice(VK_NULL_HANDLE), _device(VK_NULL_HANDLE)
+{
+}
+
 VMemoryManager::VMemoryManager( const VkPhysicalDevice& physDevice,
                                 const VDeleter<VkDevice>& device )
     : _physDevice( physDevice ), _device( device )
 {
+}
+
+void VMemoryManager::init(const VkPhysicalDevice& physDevice,
+	const VDeleter<VkDevice>& device)
+{
+	_physDevice = physDevice;
+	_device = device;
 }
 
 VMemAlloc VMemoryManager::alloc( const VkMemoryRequirements& requirements,

@@ -18,7 +18,7 @@ class VMemoryPool
   public:
    VMemoryPool( uint64_t size,
                 const VkPhysicalDevice& physDevice,
-                const VDeleter<VkDevice>& device,
+                const VkDevice& device,
                 uint32_t memTypeMask,
                 VkMemoryPropertyFlags type,
                 uint64_t maxAllocCount = 200 );
@@ -32,7 +32,7 @@ class VMemoryPool
    std::string _debugPrint( int totalLength, char empty, char used ) const;
 
   private:
-   const VDeleter<VkDevice>& _device;
+   const VkDevice _device;
    VDeleter<VkDeviceMemory> _memory{_device, vkFreeMemory};
    MemoryPool _pool;
    VkPhysicalDeviceMemoryProperties _memProperties;
@@ -42,7 +42,9 @@ class VMemoryPool
 class VMemoryManager
 {
   public:
+   VMemoryManager();
    VMemoryManager( const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& device );
+   void init(const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& device);
    VMemAlloc alloc( const VkMemoryRequirements& requirements,
                     const VkMemoryPropertyFlags& properties );
    void free( VMemAlloc& alloc );
@@ -66,8 +68,8 @@ class VMemoryManager
 
    std::vector<std::vector<std::unique_ptr<VMemoryPool> > > _pools;
    std::vector<PoolsType> _poolsProperties;
-   const VkPhysicalDevice& _physDevice;
-   const VDeleter<VkDevice>& _device;
+   VkPhysicalDevice _physDevice;
+   VkDevice _device;
 };
 
 #endif  // VK_MEMORY_POOL_
