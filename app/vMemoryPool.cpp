@@ -97,7 +97,7 @@ VMemoryManager::VMemoryManager( const VkPhysicalDevice& physDevice,
 }
 
 void VMemoryManager::init(const VkPhysicalDevice& physDevice,
-	const VDeleter<VkDevice>& device)
+	const VkDevice& device)
 {
 	_physDevice = physDevice;
 	_device = device;

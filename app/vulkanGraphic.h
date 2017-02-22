@@ -56,9 +56,8 @@ class VulkanGraphic
    bool createDepthImage();
    bool createThreadResources();
 
-   void addGeom(VThread::VThreadResources* resources,
-	   const std::vector<Vertex>& vertices,
-	   const std::vector<uint32_t>& indices);
+   void addGeom(const std::vector<Vertex>& vertices,
+				const std::vector<uint32_t>& indices);
 
    void updateUBO( const UniformBufferObject& ubo );
 

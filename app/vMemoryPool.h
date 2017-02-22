@@ -44,7 +44,7 @@ class VMemoryManager
   public:
    VMemoryManager();
    VMemoryManager( const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& device );
-   void init(const VkPhysicalDevice& physDevice, const VDeleter<VkDevice>& device);
+   void init(const VkPhysicalDevice& physDevice, const VkDevice& device);
    VMemAlloc alloc( const VkMemoryRequirements& requirements,
                     const VkMemoryPropertyFlags& properties );
    void free( VMemAlloc& alloc );

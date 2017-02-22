@@ -38,7 +38,7 @@ class VDeleter
    VDeleter( VkDevice device,
 	   std::function<void(VkDevice, T, VkAllocationCallbacks*)> deletef)
    {
-	   this->deleter = [&device, deletef](T obj) { deletef(device, obj, nullptr); };
+	   this->deleter = [device, deletef](T obj) { deletef(device, obj, nullptr); };
    }
 
    T* get() {

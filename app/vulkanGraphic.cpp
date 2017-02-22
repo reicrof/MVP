@@ -146,7 +146,7 @@ bool areDeviceExtensionsSupported( const VkPhysicalDevice& device,
 }
 
 void endSingleTimeCommands( VkCommandBuffer commandBuffer,
-                            VDeleter<VkDevice>& device,
+                            VkDevice device,
                             VkQueue& queue,
                             VCommandPool& commandPool,
                             uint32_t waitSemCount = 0,
@@ -175,7 +175,7 @@ void endSingleTimeCommands( VkCommandBuffer commandBuffer,
 VkCommandBuffer copyBuffer( VkBuffer source,
                             VkBuffer dest,
                             VkDeviceSize size,
-                            VDeleter<VkDevice>& device,
+                            VkDevice device,
                             VCommandPool& commandPool,
                             VkQueue& queue,
                             uint32_t waitSemCount = 0,
@@ -520,10 +520,14 @@ bool VulkanGraphic::createLogicalDevice()
    vkGetDeviceQueue( _device, _transferQueue.familyIndex, 0, &_transferQueue.handle );
 
    auto& r = _thread.getThreadResources();
+   r._device = _device;
    r._graphicQueueFamilly = _graphicQueue.familyIndex;
    r._transferQueueFamilly = _transferQueue.familyIndex;
    vkGetDeviceQueue(_device, _graphicQueue.familyIndex, 0, &r._graphicQueue);
    vkGetDeviceQueue(_device, _transferQueue.familyIndex, 0, &r._transferQueue);
+
+   _memoryManager.init(_physDevice, _device);
+   _thread.init(_physDevice, _device);
 
    return true;
 }
@@ -984,6 +988,31 @@ bool VulkanGraphic::createDescriptorSet()
    return true;
 }
 
+static VMemAlloc static_createBuffer(VkDevice device,
+	VMemoryManager& memoryManager,
+	VkMemoryPropertyFlags memProperty,
+	VkDeviceSize size,
+	VkBufferUsageFlags usage,
+	VkBuffer& buffer)
+{
+	VkBufferCreateInfo bufferInfo = {};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = size;
+	bufferInfo.usage = usage;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	VK_CALL(vkCreateBuffer(device, &bufferInfo, nullptr, &buffer));
+
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+	const VMemAlloc alloc = memoryManager.alloc(memRequirements, memProperty);
+
+	vkBindBufferMemory(device, buffer, alloc.memory, alloc.offset);
+
+	return alloc;
+}
+
 inline VMemAlloc VulkanGraphic::createBuffer( VkMemoryPropertyFlags memProperty,
                                               VkDeviceSize size,
                                               VkBufferUsageFlags usage,
@@ -1198,10 +1227,76 @@ bool VulkanGraphic::createIndexBuffer( const std::vector<uint32_t>& indices )
    return true;
 }
 
-void VulkanGraphic::addGeom(VThread::VThreadResources* resources,
+static void addGeomImp(VThread::VThreadResources* resources,
 	const std::vector<Vertex>& vertices,
 	const std::vector<uint32_t>& indices)
 {
+	//// Create fence for syncronization
+	//VkFence fence;
+	//VkFenceCreateInfo createInfo = {};
+	//createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	//createInfo.pNext = nullptr;
+	//createInfo.flags = 0;
+	//vkCreateFence(resources->_device, &createInfo, nullptr, &fence);
+
+	//VkBuffer vertexBuffer, indexBuffer;
+
+
+	///*VGeom geom;
+	//geom._verticesCount = static_cast<uint32_t>(vertices.size());
+	//geom._indexCount = static_cast<uint32_t>(indices.size());*/
+
+	//const size_t vertexBufferSize = sizeof((vertices[0])) * vertices.size();
+	//const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
+	//const size_t combinedSize = vertexBufferSize + indexBufferSize;
+
+	//// Allocate staging buffer for both vertices and indices
+	//VDeleter<VkBuffer> stagingBuffer{ resources->_device, vkDestroyBuffer };
+	//VDeleter<VkDeviceMemory> stagingBufferMemory{ resources->_device, vkFreeMemory };
+	//VMemAlloc hostBuffer =
+	//	static_createBuffer(resources->_device, resources->_memoryManager,
+	//		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+	//		combinedSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, *stagingBuffer.get());
+
+	//// Copy vertices to it
+	//void* data;
+	//VK_CALL(vkMapMemory(resources->_device, hostBuffer.memory, hostBuffer.offset, combinedSize, 0, &data));
+	//memcpy(data, vertices.data(), vertexBufferSize);
+	//memcpy(static_cast<char*>(data) + vertexBufferSize, indices.data(), indexBufferSize);
+	//vkUnmapMemory(resources->_device, hostBuffer.memory);
+
+	//static_createBuffer(resources->_device, resources->_memoryManager, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBufferSize,
+	//	VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+	//	vertexBuffer);
+	//static_createBuffer(resources->_device, resources->_memoryManager, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBufferSize,
+	//	VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+	//	indexBuffer);
+
+	//VkCommandBuffer cpyVert = copyBuffer(stagingBuffer, vertexBuffer, vertexBufferSize, resources->_device,
+	//	resources->_transferCommandPool, resources->_transferQueue);
+	//VkCommandBuffer cpyIdx = copyBuffer(stagingBuffer, indexBuffer, indexBufferSize, resources->_device,
+	//	resources->_transferCommandPool, resources->_transferQueue, 0, nullptr, 0, nullptr, fence);
+
+	//// Wait for the transfer to finish
+	//VK_CALL(vkWaitForFences(resources->_device, 1, &fence, VK_FALSE, std::numeric_limits<uint64_t>::max()));
+
+	//vkDeviceWaitIdle(resources->_device);
+	////{
+	////	std::lock_guard<std::mutex> lock(_geomsMutex);
+	////	_geoms[_geomsToDraw] = std::move(geom);
+	////}
+	////++_geomsToDraw;
+
+	////freeBuffer(hostBuffer);
+	////_loadCommandPool.free(cpyVert);
+	////_loadCommandPool.free(cpyIdx);
+}
+
+
+void VulkanGraphic::addGeom(const std::vector<Vertex>& vertices,
+	const std::vector<uint32_t>& indices)
+{
+	_thread.addJob(addGeomImp, vertices, indices);
 }
 
 bool VulkanGraphic::createUniformBuffer()
