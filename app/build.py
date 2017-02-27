@@ -5,7 +5,7 @@ import getopt
 import datetime
 
 outName = "mvp"
-srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp", "MemoryPool.cpp", "vMemoryPool.cpp", "vImage.cpp", "vCommandPool.cpp", "Camera.cpp"]
+srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp", "MemoryPool.cpp", "vMemoryPool.cpp", "vImage.cpp", "vCommandPool.cpp", "Camera.cpp", "vThread.cpp"]
 coreInclude = ["../core/"]
 
 # Third parties includes

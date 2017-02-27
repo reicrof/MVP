@@ -187,9 +187,8 @@ static bool loadModelImp( const std::string& path,
             indices->push_back( (uint32_t)indices->size() );
          }
       }
-	  VKPtr->addGeom(*vertices, *indices);
-
-      return true;
+      auto buffersFuture = VKPtr->addGeom( *vertices, *indices );
+      return buffersFuture.get();
    }
    else
    {
@@ -227,7 +226,6 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createDescriptorPool(), "Cannot create descriptor pool." );
    VERIFY( VK.createDescriptorSet(), "Cannot create descriptor set." );
    VERIFY( VK.createSemaphores(), "Cannot create semaphores." );
-   VERIFY(VK.createThreadResources(), "Cannot create thread resources.");
 }
 
 void updateUBO( const Camera& cam, UniformBufferObject& ubo )
@@ -365,7 +363,7 @@ int main()
 
    std::vector<Vertex> vertices;
    std::vector<uint32_t> indices;
- 
+
    glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
    GLFWwindow* window = glfwCreateWindow( 800, 600, "MVP", nullptr, nullptr );
 
@@ -380,7 +378,7 @@ int main()
    VulkanGraphic VK( extensions );
    initVulkan( VK, window );
    VKPtr = &VK;
-   auto done = loadModel(threadPool, "../models/armadillo.obj", &vertices, &indices);
+   auto model = loadModel( threadPool, "../models/armadillo.obj", &vertices, &indices );
 
    cam.setPos( glm::vec3( 0.0f, 0.0f, 10.0f ) );
 
@@ -400,18 +398,9 @@ int main()
    unsigned frameRendered = 0;
 
    cam.setExtent( VK.getSwapChain()->_curExtent.width, VK.getSwapChain()->_curExtent.height );
-   bool modelLoaded = false;
 
    while ( !glfwWindowShouldClose( window ) )
    {
-      if ( !modelLoaded && done.wait_for( std::chrono::seconds( 0 ) ) == std::future_status::ready )
-      {
-         VK.createVertexBuffer( vertices );
-         VK.createIndexBuffer( indices );
-         VK.recreateSwapChain();
-         modelLoaded = true;
-      }
-
       // Grab the next frame to render.
       VK.onNewFrame();
 

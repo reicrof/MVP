@@ -35,24 +35,20 @@ class VDeleter
       this->deleter = [&device, deletef]( T obj ) { deletef( device, obj, nullptr ); };
    }
 
-   VDeleter( VkDevice device,
-	   std::function<void(VkDevice, T, VkAllocationCallbacks*)> deletef)
+   VDeleter( VkDevice device, std::function<void( VkDevice, T, VkAllocationCallbacks* )> deletef )
    {
-	   this->deleter = [device, deletef](T obj) { deletef(device, obj, nullptr); };
+      this->deleter = [device, deletef]( T obj ) { deletef( device, obj, nullptr ); };
    }
 
-   T* get() {
-	   return &object;
+   T* get() { return &object; }
+   void set( const T& newObject )
+   {
+      cleanup();
+      object = newObject;
    }
 
-   const T* get() const {
-	   return &object;
-   }
-
-   const T* operator &() const {
-	   return &object;
-   }
-
+   const T* get() const { return &object; }
+   const T* operator&() const { return &object; }
    ~VDeleter() { cleanup(); }
    T* operator&()
    {

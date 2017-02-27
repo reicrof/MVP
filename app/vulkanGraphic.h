@@ -9,12 +9,15 @@
 #include "vImage.h"
 #include "vCommandPool.h"
 #include "vThread.h"
+#include "vGeom.h"
 #include <fstream>
 #include <memory>
 #include <vector>
+#include <atomic>
 #include <vulkan/vulkan.h>
 
 struct GLFWwindow;
+class VGeom;
 
 void DestroyDebugReportCallbackEXT( VkInstance instance,
                                     VkDebugReportCallbackEXT callback,
@@ -45,8 +48,6 @@ class VulkanGraphic
    bool createDescriptorPool();
    VkCommandBuffer createCommandBuffers( unsigned frameIdx );
    bool createSemaphores();
-   bool createVertexBuffer( const std::vector<Vertex>& vertices );
-   bool createIndexBuffer( const std::vector<uint32_t>& indices );
    bool createDescriptorSetLayout();
    bool createDescriptorSet();
    bool createUniformBuffer();
@@ -54,10 +55,9 @@ class VulkanGraphic
    bool createTextureImageView();
    bool createTextureSampler();
    bool createDepthImage();
-   bool createThreadResources();
 
-   void addGeom(const std::vector<Vertex>& vertices,
-				const std::vector<uint32_t>& indices);
+   std::future<bool> addGeom( const std::vector<Vertex>& vertices,
+                              const std::vector<uint32_t>& indices );
 
    void updateUBO( const UniformBufferObject& ubo );
 
@@ -125,12 +125,7 @@ class VulkanGraphic
    VDeleter<VkFence> _uboUpdatedFence{_device, vkDestroyFence};
    VkCommandBuffer _uboUpdateCmdBuf;
 
-   VDeleter<VkBuffer> _vertexBuffer{_device, vkDestroyBuffer};
-   VDeleter<VkBuffer> _indexBuffer{_device, vkDestroyBuffer};
-
    VMemoryManager _memoryManager{_physDevice, _device};
-   uint32_t _verticesCount = 0;
-   uint32_t _indexCount = 0;
 
    VDeleter<VkBuffer> _uniformStagingBuffer{_device, vkDestroyBuffer};
    VMemAlloc _uniformStagingBufferMemory;
@@ -146,6 +141,9 @@ class VulkanGraphic
    VImage _depthImage{_device};
    VDeleter<VkDeviceMemory> _depthImageMemory{_device, vkFreeMemory};
    VDeleter<VkImageView> _depthImageView{_device, vkDestroyImageView};
+
+   std::array<VGeom, 100> _geoms;
+   std::atomic_uint32_t _geomsToDraw{0};
 
    VDeleter<VkDebugReportCallbackEXT> _validationCallback{_instance, DestroyDebugReportCallbackEXT};
    std::unique_ptr<std::ofstream> _outErrorFile;

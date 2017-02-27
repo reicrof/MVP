@@ -6,9 +6,10 @@
 
 class VGeom
 {
-public:
-	VkBuffer _vertexBuffer;
-	VkBuffer _indexBuffer;
+  public:
+   VGeom() = default;
+   VkBuffer _vertexBuffer;
+   VkBuffer _indexBuffer;
 
    uint32_t _verticesCount = 0;
    uint32_t _indexCount = 0;
