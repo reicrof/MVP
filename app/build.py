@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import subprocess
 import sys
 import platform
@@ -11,6 +12,7 @@ coreInclude = ["../core/"]
 # Third parties includes
 #clang = "-stdlib=libc++"
 stdlib = [""]
+analyzer = [""]
 glfwInclude = [ "../thirdParties/glfw/include/" ]
 glmInclude = [ "../thirdParties/" ]
 vulkanLibPath = ["../thirdParties/vulkan/"]
@@ -33,8 +35,10 @@ elif platform.system() == "Windows":
    libs = [ "-lkernel32", "-lglfw3dll", "-luser32", "-lvulkan-1" ]
    outName += ".exe"
 
+shouldLink = True;
+
 # Parse arguments to replace default values
-opts, args = getopt.getopt(sys.argv[1:],"c:s:l:")
+opts, args = getopt.getopt(sys.argv[1:],"ac:s:l:")
 for opt, arg in opts:
    if opt == '-c':
       compiler = arg
@@ -42,11 +46,21 @@ for opt, arg in opts:
       cppVersion = ["-std="+str(arg)]
    elif opt == '-l':
       stdlib = ["-stdlib="+str(arg)]
+   elif opt == '-a':
+      shouldLink = False
+      analyzer = ["--analyze", "-Xanalyzer", "-analyzer-output=html"]
+
+buildCommand = [ compiler ] + cppVersion + stdlib + analyzer + commonCompilerFlags + compilerFlags + srcFiles + ["-I"] + glfwInclude + ["-I"] + vulkanIncludePath + \
+               ["-I"] + glmInclude + ["-I"] + stbIncludePath + ["-I"] + tinyobjIncludePath +  ["-I"] + coreInclude
+
+linkCommand =  ["-L"] + glfwLibPath + ["-L"] + vulkanLibPath + libs + ["-o"] + [ outName ]
+
+if shouldLink:
+    buildCommand += linkCommand
 
 buildStartTime = datetime.datetime.now()
 print "Building on " + platform.system() + " with " + compiler + " at " + str(buildStartTime)
-result = subprocess.call( [ compiler ] + cppVersion + stdlib + commonCompilerFlags + compilerFlags + srcFiles + ["-I"] + glfwInclude + ["-I"] + vulkanIncludePath + \
-                  ["-I"] + glmInclude + ["-I"] + stbIncludePath + ["-I"] + tinyobjIncludePath +  ["-I"] + coreInclude + ["-L"] + glfwLibPath + ["-L"] + vulkanLibPath + libs + ["-o"] + [ outName ] )
+result = subprocess.call( buildCommand )
 
 buildEndTime = datetime.datetime.now()
 if result != 0:
