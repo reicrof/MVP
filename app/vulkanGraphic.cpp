@@ -649,7 +649,7 @@ bool VulkanGraphic::createDescriptorSetLayout()
    uboLayoutBinding.binding = 0;
    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
    uboLayoutBinding.descriptorCount = 1;
-   uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+   uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
    uboLayoutBinding.pImmutableSamplers = nullptr;
 
    VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
@@ -952,7 +952,7 @@ bool VulkanGraphic::createDescriptorSet()
    VkDescriptorBufferInfo bufferInfo = {};
    bufferInfo.buffer = _uniformBuffer;
    bufferInfo.offset = 0;
-   bufferInfo.range = sizeof( UniformBufferObject );
+   bufferInfo.range = sizeof( UniformBufferObject ) + sizeof( PBRMaterial );
 
    VkDescriptorImageInfo imageInfo = {};
    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1128,16 +1128,16 @@ VkCommandBuffer VulkanGraphic::createCommandBuffers( unsigned frameIdx )
       vkCmdDrawIndexed( commandBuffer, _geoms[ i ]._indexCount, 1, 0, 0, 0 );
    }
 
-   vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsWidgetPipeline );
+   //vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsWidgetPipeline );
 
-   for ( size_t i = 0; i < _geomsToDraw; ++i )
-   {
-      VkBuffer vertexBuffers[] = {_geoms[ i ]._vertexBuffer};
-      VkDeviceSize offsets[] = {0};
-      vkCmdBindVertexBuffers( commandBuffer, 0, 1, vertexBuffers, offsets );
-      vkCmdBindIndexBuffer( commandBuffer, _geoms[ i ]._indexBuffer, 0, VK_INDEX_TYPE_UINT32 );
-      vkCmdDrawIndexed( commandBuffer, _geoms[ i ]._indexCount, 1, 0, 0, 0 );
-   }
+   //for ( size_t i = 0; i < _geomsToDraw; ++i )
+   //{
+   //   VkBuffer vertexBuffers[] = {_geoms[ i ]._vertexBuffer};
+   //   VkDeviceSize offsets[] = {0};
+   //   vkCmdBindVertexBuffers( commandBuffer, 0, 1, vertexBuffers, offsets );
+   //   vkCmdBindIndexBuffer( commandBuffer, _geoms[ i ]._indexBuffer, 0, VK_INDEX_TYPE_UINT32 );
+   //   vkCmdDrawIndexed( commandBuffer, _geoms[ i ]._indexCount, 1, 0, 0, 0 );
+   //}
 
 
    vkCmdEndRenderPass( commandBuffer );
@@ -1249,7 +1249,7 @@ std::future<bool> VulkanGraphic::addGeom( const std::vector<Vertex>& vertices,
 
 bool VulkanGraphic::createUniformBuffer()
 {
-   VkDeviceSize bufferSize = sizeof( UniformBufferObject );
+   VkDeviceSize bufferSize = sizeof( UniformBufferObject ) + sizeof( PBRMaterial );
 
    _uniformStagingBufferMemory =
       createBuffer( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -1265,7 +1265,7 @@ bool VulkanGraphic::createTextureImage()
 {
    int width, height, channels;
    stbi_uc* pixels =
-      stbi_load( "../textures/chalet.jpg", &width, &height, &channels, STBI_rgb_alpha );
+      stbi_load( "../models/1911/Tex_0008_1.png", &width, &height, &channels, STBI_rgb_alpha );
    VkDeviceSize size = width * height * 4;
 
    assert( pixels && "Error loading texture" );
@@ -1351,15 +1351,16 @@ bool VulkanGraphic::createDepthImage()
    return true;
 }
 
-void VulkanGraphic::updateUBO( const UniformBufferObject& ubo )
+void VulkanGraphic::updateUBO( const UniformBufferObject& ubo, const PBRMaterial& pbr )
 {
    void* data;
    vkMapMemory( _device, _uniformStagingBufferMemory.memory, _uniformStagingBufferMemory.offset,
-                sizeof( ubo ), 0, &data );
-   memcpy( data, &ubo, sizeof( ubo ) );
+                sizeof( ubo ) + sizeof( pbr ), 0, &data );
+   memcpy( data, &ubo, sizeof( ubo ));
+   memcpy((char*)data + sizeof(ubo), &pbr, sizeof(pbr));
    vkUnmapMemory( _device, _uniformStagingBufferMemory.memory );
 
-   _uboUpdateCmdBuf = copyBuffer( _uniformStagingBuffer, _uniformBuffer, sizeof( ubo ), _device,
+   _uboUpdateCmdBuf = copyBuffer( _uniformStagingBuffer, _uniformBuffer, sizeof( ubo ) + sizeof(pbr), _device,
                                   _transferCommandPools[ _curFrameIdx ], _transferQueue.handle, 0,
                                   nullptr, 1, _uboUpdatedSemaphore.get() );
 }

@@ -237,7 +237,9 @@ void updateUBO( const Camera& cam, UniformBufferObject& ubo )
       std::chrono::duration_cast<std::chrono::milliseconds>( currentTime - startTime ).count() /
       10000.0f;
 
-   ubo.model =
+   ubo.model = glm::mat4();
+   glm::scale(ubo.model, glm::vec3(0.2f, 0.2f, 0.2f));
+   ubo.model *=
       glm::rotate( glm::mat4(), time * glm::radians( 90.0f ), glm::vec3( 0.0f, 1.0f, 0.0f ) );
 
    ubo.view = cam.getView();
@@ -245,7 +247,7 @@ void updateUBO( const Camera& cam, UniformBufferObject& ubo )
 }
 
 #include "glmIncludes.h"
-Camera cam( 45.0f, 1920, 1080, 0.1f, 20 );
+Camera cam( 45.0f, 1920, 1080, 0.1f, 2000 );
 void onMousePos( GLFWwindow* window, double x, double y )
 {
    constexpr double X_SENSITIVITY = 0.002;
@@ -378,9 +380,14 @@ int main()
    VulkanGraphic VK( extensions );
    initVulkan( VK, window );
    VKPtr = &VK;
-   auto model = loadModel( threadPool, "../models/armadillo.obj", &vertices, &indices );
+   //auto model = loadModel( threadPool, "../models/armadillo.obj", &vertices, &indices );
+   auto model = loadModel(threadPool, "../models/bunny.obj", &vertices, &indices);
+   //auto model = loadModel(threadPool, "../models/1911/gun-pbribl.obj", &vertices, &indices);
+   //auto model = loadModel(threadPool, "../models/ak/AKM.obj", &vertices, &indices);
+   //auto model = loadModel(threadPool, "../models/1911/ksr-29-sniper-rifle.obj", &vertices, &indices);
+   
 
-   cam.setPos( glm::vec3( 0.0f, 0.0f, 10.0f ) );
+   cam.setPos( glm::vec3( 0.0f, 0.0f, 20.0f ) );
 
    // Setup callback function
    keyboardActionInit();
@@ -399,6 +406,15 @@ int main()
 
    cam.setExtent( VK.getSwapChain()->_curExtent.width, VK.getSwapChain()->_curExtent.height );
 
+   PBRMaterial gold, nickel;
+   gold.color = glm::vec3(1.0f, 0.765557f, 0.336057f);
+   gold.rough = 0.1f;
+   gold.metal = 1.0f;
+
+   nickel.color = glm::vec3(0.659777f, 0.608679f, 0.525649f);
+   nickel.rough = 0.1f;
+   nickel.metal = 1.0f;
+
    while ( !glfwWindowShouldClose( window ) )
    {
       // Grab the next frame to render.
@@ -406,7 +422,7 @@ int main()
 
       updateCoreDll();
       updateUBO( cam, ubo );
-      VK.updateUBO( ubo );
+      VK.updateUBO( ubo, nickel);
       //// std::cout << ptr() << std::endl;
       glfwPollEvents();
       pollKeyboard( window );
