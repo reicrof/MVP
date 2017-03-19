@@ -34,10 +34,10 @@ void main()
 {
    gl_Position = ubo.proj * ubo.view * ubo.model * vec4( inPosition, 1.0 );
    fragTexCoord = inTexCoord;
-   outNormal = inNormals;
    lightPos = vec3(5.0f, 5.0f, 5.0f);
    roughMetal = vec2( ubo.rough, ubo.metal );
    outColor = ubo.color;
    outCamPos = vec3( ubo.view[3] );
-   outWorldPos = vec3( ubo.proj * ubo.view * ubo.model * vec4( inPosition, 1.0 ) );
+   outWorldPos = vec3( ubo.model * vec4( inPosition, 1.0 ) );
+   outNormal = vec3( ubo.model * vec4( inNormals, 1.0 ) );;
 }

@@ -11,39 +11,40 @@ layout( location = 6 ) in vec3 camPos;
 layout( location = 7 ) in vec3 inWorldPos;
 
 layout( binding = 1 ) uniform sampler2D texSampler;
+layout( binding = 2 ) uniform samplerCube irrSampler;
 
 layout( location = 0 ) out vec4 outColor;
 
 
 const float PI = 3.14159265359;
 
-//#define ROUGHNESS_PATTERN 1
-
-// Normal Distribution function --------------------------------------
-float D_GGX( float dotNH, float roughness )
+float ggx( float rough, vec3 n, vec3 h )
 {
-   float alpha = roughness * roughness;
-   float alpha2 = alpha * alpha;
-   float denom = dotNH * dotNH * ( alpha2 - 1.0 ) + 1.0;
-   return ( alpha2 ) / ( PI * denom * denom );
+   float alpha2 = ( rough * rough ) * ( rough * rough );
+   float NdotH = clamp( dot( n, h ), 0.0, 1.0 );
+   // float NdotH = dot( n, h );
+   float ndothalpha = ( ( NdotH * NdotH ) * ( alpha2 - 1 ) ) + 1;
+   float denom = PI * ( ndothalpha * ndothalpha );
+
+   return alpha2 / denom;
 }
 
-// Geometric Shadowing function --------------------------------------
-float G_SchlickmithGGX( float dotNL, float dotNV, float roughness )
+float schlick( float roughness, vec3 n, vec3 v, vec3 l )
 {
-   float r = ( roughness + 1.0 );
-   float k = ( r * r ) / 8.0;
-   float GL = dotNL / ( dotNL * ( 1.0 - k ) + k );
-   float GV = dotNV / ( dotNV * ( 1.0 - k ) + k );
-   return GL * GV;
+   float k = ( ( roughness + 1 ) * ( roughness + 1 ) ) / 8.0;
+   float nDotV = clamp( dot( n, v ), 0.0, 1.0 );
+   float nDotL = clamp( dot( n, l ), 0.0, 1.0 );
+   float G1v = nDotV / ( nDotV * ( 1 - k ) + k );
+   float G1l = nDotL / ( nDotL * ( 1 - k ) + k );
+
+   return G1v * G1l;
 }
 
-// Fresnel function ----------------------------------------------------
-vec3 F_Schlick( float cosTheta, float metallic )
+float fresnel( float F0, vec3 v, vec3 h )
 {
-   vec3 F0 = mix( vec3( 0.04 ), inColor, metallic );  // * material.specular
-   vec3 F = F0 + ( 1.0 - F0 ) * pow( 1.0 - cosTheta, 5.0 );
-   return F;
+   float VdotH = clamp( dot( v, h ), 0.0, 1.0 );
+   float exp = -5.55473 * VdotH * -6.98316 * VdotH;
+   return F0 + ( 1.0 - F0 ) * pow( 2, exp );
 }
 
 // Specular BRDF composition --------------------------------------------
@@ -66,21 +67,20 @@ vec3 BRDF( vec3 L, vec3 V, vec3 N, float metallic, float roughness )
    {
       float rroughness = max( 0.05, roughness );
       // D = Normal distribution (Distribution of the microfacets)
-      float D = D_GGX( dotNH, roughness );
+      float D = ggx( roughness, N, H );
       // G = Geometric shadowing term (Microfacets shadowing)
-      float G = G_SchlickmithGGX( dotNL, dotNV, roughness );
+      float G = schlick( roughness, N, V, L );
       // F = Fresnel factor (Reflectance depending on angle of incidence)
-      vec3 F = F_Schlick( dotNV, metallic );
+      float F = fresnel( metallic, V, H );
 
-      vec3 spec = D * F * G / ( 4.0 * dotNL * dotNV );
+      // vec3 spec = D * F * G / ( 4.0 * dotNL * dotNV );
+      float spec = D * F * G / ( 4.0 * dotNL * dotNV );
 
       color += spec * dotNL * lightColor;
    }
 
    return color;
 }
-
-
 
 void main()
 {
