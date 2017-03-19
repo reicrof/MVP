@@ -71,4 +71,41 @@ class VDeleter
    }
 };
 
+struct VMemAlloc;
+class VMemoryManager;
+class VCommandPool;
+
+namespace VkUtils
+{
+	void endCmdBufferAndSubmit(
+		VkCommandBuffer cmdBuf,
+		VkQueue& queue,
+		uint32_t waitSemCount = 0,
+		VkSemaphore* waitSem = nullptr,
+		uint32_t signalSemCount = 0,
+		VkSemaphore* signalSem = nullptr,
+		VkFence fenceToSignal = VK_NULL_HANDLE);
+
+	VkCommandBuffer copyBuffer(
+		VkCommandBuffer cmdBuffer,
+		VkBuffer source,
+		VkBuffer dest,
+		VkDeviceSize size );
+
+	VMemAlloc createBuffer(
+		VkDevice device,
+		VMemoryManager& memoryManager,
+		VkMemoryPropertyFlags memProperty,
+		VkDeviceSize size,
+		VkBufferUsageFlags usage,
+		VkBuffer& buffer);
+
+	VkCommandBuffer transitionImgLayout(
+		VkImage image,
+		VkFormat format,
+		VkImageLayout oldLayout,
+		VkImageLayout newLayout,
+		VkCommandBuffer cmdBuffer);
+}
+
 #endif  // !VK_UTILS_H_

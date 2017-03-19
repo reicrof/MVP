@@ -219,7 +219,8 @@ static void initVulkan( VulkanGraphic& VK, GLFWwindow* window )
    VERIFY( VK.createCommandPool(), "Cannot create command pool." );
    VERIFY( VK.createTextureImage(), "Cannot create texture" );
    VERIFY( VK.createTextureImageView(), "Cannot create texture view" );
-   VERIFY( VK.createTextureSampler(), "Cannot create texture sampler" );
+   VERIFY(VK.createTextureSampler(), "Cannot create texture sampler");
+   VERIFY(VK.createIBLTexture(), "Cannot create ibl textures.");
    VERIFY( VK.createDepthImage(), "Cannot create depth image." );
    VERIFY( VK.createFrameBuffers(), "Cannot create frame buffer." );
    VERIFY( VK.createUniformBuffer(), "Cannot create uniform buffer." );
@@ -412,7 +413,7 @@ int main()
    gold.metal = 1.0f;
 
    nickel.color = glm::vec3(0.659777f, 0.608679f, 0.525649f);
-   nickel.rough = 0.1f;
+   nickel.rough = 0.001f;
    nickel.metal = 1.0f;
 
    while ( !glfwWindowShouldClose( window ) )
@@ -422,7 +423,7 @@ int main()
 
       updateCoreDll();
       updateUBO( cam, ubo );
-      VK.updateUBO( ubo, nickel);
+      VK.updateUBO( ubo, gold);
       //// std::cout << ptr() << std::endl;
       glfwPollEvents();
       pollKeyboard( window );

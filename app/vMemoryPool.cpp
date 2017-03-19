@@ -58,10 +58,8 @@ uint64_t VMemoryPool::alloc( uint64_t size, uint64_t alignment )
 void VMemoryPool::free( VMemAlloc& mem )
 {
    _pool.free( mem.offset );
-#ifdef DEBUG
    mem.memory = nullptr;
    mem.offset = -1;
-#endif  // DEBUG
 }
 
 uint64_t VMemoryPool::spaceLeft() const
@@ -161,10 +159,6 @@ VMemAlloc VMemoryManager::alloc( const VkMemoryRequirements& requirements,
 
 void VMemoryManager::free( VMemAlloc& alloc )
 {
-#ifdef _DEBUG
-   bool allocFreed = false;
-#endif
-
    for ( auto& poolList : _pools )
    {
       for ( auto& pool : poolList )
@@ -172,16 +166,12 @@ void VMemoryManager::free( VMemAlloc& alloc )
          if ( *pool.get() == alloc.memory )
          {
             pool->free( alloc );
-#ifdef _DEBUG
-            allocFreed = true;
-#endif
+			return;
          }
       }
    }
 
-#ifdef _DEBUG
-   assert( allocFreed );
-#endif
+   assert( false && "Alloc not found" );
 }
 
 #include <iostream>

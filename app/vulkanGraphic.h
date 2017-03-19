@@ -10,6 +10,9 @@
 #include "vCommandPool.h"
 #include "vThread.h"
 #include "vGeom.h"
+
+#include <gli/gli.hpp>
+
 #include <fstream>
 #include <memory>
 #include <vector>
@@ -62,6 +65,7 @@ class VulkanGraphic
    bool createTextureImageView();
    bool createTextureSampler();
    bool createDepthImage();
+   bool createIBLTexture();
 
    std::future<bool> addGeom( const std::vector<Vertex>& vertices,
                               const std::vector<uint32_t>& indices );
@@ -89,15 +93,30 @@ class VulkanGraphic
                            VkDeviceSize size,
                            VkBufferUsageFlags usage,
                            VDeleter<VkBuffer>& buffer );
+   static VMemAlloc createBuffer(VkDevice device,
+								VMemoryManager& memoryManager,
+								VkMemoryPropertyFlags memProperty,
+								VkDeviceSize size,
+								VkBufferUsageFlags usage,
+								VkBuffer& buffer);
    void freeBuffer( VMemAlloc& alloc );
 
    void createImage( uint32_t width,
                      uint32_t height,
+					 uint32_t mips,
                      VkFormat format,
                      VkImageTiling tiling,
                      VkImageUsageFlags usage,
                      VkMemoryPropertyFlags memProperty,
                      VImage& image );
+   std::unique_ptr< gli::texture > createImage(const std::string& path,
+	   VkFormat format,
+	   VkImageTiling tiling,
+	   VkImageUsageFlags usage,
+	   VkMemoryPropertyFlags memProperty,
+	   VImage& image);
+
+   bool createCubeMap(const std::string& path, VImage& img, VDeleter<VkImageView>& imgView, VDeleter<VkSampler>& imgSampler);
 
    bool createShaderModule( const std::string& shaderPath, VDeleter<VkShaderModule>& shaderModule );
    void recreateSwapChainIfNotValid( VkResult res );
@@ -139,11 +158,15 @@ class VulkanGraphic
    VDeleter<VkBuffer> _uniformBuffer{_device, vkDestroyBuffer};
 
    VImage _stagingImage{_device};
-
    VImage _textureImage{_device};
-   VDeleter<VkDeviceMemory> _textureImageMemory{_device, vkFreeMemory};
+   VImage _radianceTexture{ _device };
+   VImage _irradianceTexture{ _device };
    VDeleter<VkImageView> _textureImageView{_device, vkDestroyImageView};
+   VDeleter<VkImageView> _radianceImageView{ _device, vkDestroyImageView };
+   VDeleter<VkImageView> _irradianceImageView{ _device, vkDestroyImageView };
    VDeleter<VkSampler> _textureSampler{_device, vkDestroySampler};
+   VDeleter<VkSampler> _radianceSampler{ _device, vkDestroySampler };
+   VDeleter<VkSampler> _irradianceSampler{ _device, vkDestroySampler };
 
    VImage _depthImage{_device};
    VDeleter<VkDeviceMemory> _depthImageMemory{_device, vkFreeMemory};

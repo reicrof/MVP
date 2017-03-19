@@ -66,7 +66,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback( VkDebugReportFlagsEXT flags
 {
    std::cerr << "validation layer: " << msg << std::endl;
    ( *static_cast<std::ofstream*>( userData ) ) << msg << std::endl;
-   return VK_FALSE;
+    return VK_FALSE;
 }
 
 namespace
@@ -297,6 +297,38 @@ void transitionImageLayout( VkImage image,
                          &barrier );
 
    endSingleTimeCommands( commandBuffer, device, queue, commandPool );
+}
+
+void transitionImageLayout(VkImage image,
+	VkFormat format,
+	VkImageLayout oldLayout,
+	VkImageLayout newLayout,
+	VkImageSubresourceRange subresource,
+	VDeleter<VkDevice>& device,
+	VCommandPool& commandPool,
+	VkQueue& queue)
+{
+	VkCommandBuffer commandBuffer = commandPool.alloc(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+	VkImageMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = oldLayout;
+	barrier.newLayout = newLayout;
+	// Queue family ownership
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+	barrier.image = image;
+	barrier.subresourceRange = subresource;
+
+	barrier.srcAccessMask = vkImageLayoutToAccessFlags(oldLayout);
+	barrier.dstAccessMask = vkImageLayoutToAccessFlags(newLayout);
+
+	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
+		&barrier);
+
+	endSingleTimeCommands(commandBuffer, device, queue, commandPool);
 }
 
 void createImageView( VkImage image,
@@ -659,8 +691,22 @@ bool VulkanGraphic::createDescriptorSetLayout()
    samplerLayoutBinding.pImmutableSamplers = nullptr;
    samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-   std::array<VkDescriptorSetLayoutBinding, 2> bindings = {
-      {uboLayoutBinding, samplerLayoutBinding}};
+   VkDescriptorSetLayoutBinding irradianceSamplerLayoutBinding = {};
+   irradianceSamplerLayoutBinding.binding = 2;
+   irradianceSamplerLayoutBinding.descriptorCount = 1;
+   irradianceSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+   irradianceSamplerLayoutBinding.pImmutableSamplers = nullptr;
+   irradianceSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+   VkDescriptorSetLayoutBinding radianceSamplerLayoutBinding = {};
+   radianceSamplerLayoutBinding.binding = 3;
+   radianceSamplerLayoutBinding.descriptorCount = 1;
+   radianceSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+   radianceSamplerLayoutBinding.pImmutableSamplers = nullptr;
+   radianceSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+   std::array<VkDescriptorSetLayoutBinding, 4> bindings = {
+      {uboLayoutBinding, samplerLayoutBinding, irradianceSamplerLayoutBinding, radianceSamplerLayoutBinding }};
    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
    layoutInfo.bindingCount = static_cast<uint32_t>( bindings.size() );
@@ -925,7 +971,7 @@ bool VulkanGraphic::createDescriptorPool()
    poolSizes[ 0 ].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
    poolSizes[ 0 ].descriptorCount = 1;
    poolSizes[ 1 ].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-   poolSizes[ 1 ].descriptorCount = 1;
+   poolSizes[ 1 ].descriptorCount = 3;
 
    VkDescriptorPoolCreateInfo poolInfo = {};
    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -959,7 +1005,17 @@ bool VulkanGraphic::createDescriptorSet()
    imageInfo.imageView = _textureImageView;
    imageInfo.sampler = _textureSampler;
 
-   std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
+   VkDescriptorImageInfo irradianceImageInfo = {};
+   irradianceImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+   irradianceImageInfo.imageView = _irradianceTexture._imageView;
+   irradianceImageInfo.sampler = _irradianceTexture._sampler;
+
+   VkDescriptorImageInfo radianceImageInfo = {};
+   radianceImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+   radianceImageInfo.imageView = _radianceTexture._imageView;
+   radianceImageInfo.sampler = _radianceTexture._sampler;
+
+   std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
 
    descriptorWrites[ 0 ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
    descriptorWrites[ 0 ].dstSet = _descriptorSet;
@@ -981,18 +1037,38 @@ bool VulkanGraphic::createDescriptorSet()
    descriptorWrites[ 1 ].pImageInfo = &imageInfo;
    descriptorWrites[ 1 ].pTexelBufferView = nullptr;
 
+   descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+   descriptorWrites[2].dstSet = _descriptorSet;
+   descriptorWrites[2].dstBinding = 2;
+   descriptorWrites[2].dstArrayElement = 0;
+   descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+   descriptorWrites[2].descriptorCount = 1;
+   descriptorWrites[2].pBufferInfo = nullptr;
+   descriptorWrites[2].pImageInfo = &irradianceImageInfo;
+   descriptorWrites[2].pTexelBufferView = nullptr;
+
+   descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+   descriptorWrites[3].dstSet = _descriptorSet;
+   descriptorWrites[3].dstBinding = 3;
+   descriptorWrites[3].dstArrayElement = 0;
+   descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+   descriptorWrites[3].descriptorCount = 1;
+   descriptorWrites[3].pBufferInfo = nullptr;
+   descriptorWrites[3].pImageInfo = &radianceImageInfo;
+   descriptorWrites[3].pTexelBufferView = nullptr;
+
    vkUpdateDescriptorSets( _device, static_cast<uint32_t>( descriptorWrites.size() ),
                            descriptorWrites.data(), 0, nullptr );
 
    return true;
 }
 
-static VMemAlloc static_createBuffer( VkDevice device,
-                                      VMemoryManager& memoryManager,
-                                      VkMemoryPropertyFlags memProperty,
-                                      VkDeviceSize size,
-                                      VkBufferUsageFlags usage,
-                                      VkBuffer& buffer )
+VMemAlloc VulkanGraphic::createBuffer( VkDevice device,
+								VMemoryManager& memoryManager,
+								VkMemoryPropertyFlags memProperty,
+								VkDeviceSize size,
+								VkBufferUsageFlags usage,
+								VkBuffer& buffer )
 {
    VkBufferCreateInfo bufferInfo = {};
    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1040,8 +1116,25 @@ void VulkanGraphic::freeBuffer( VMemAlloc& alloc )
    _memoryManager.free( alloc );
 }
 
+std::unique_ptr< gli::texture > VulkanGraphic::createImage(
+	const std::string& path,
+	VkFormat format,
+	VkImageTiling tiling,
+	VkImageUsageFlags usage,
+	VkMemoryPropertyFlags memProperty,
+	VImage& image)
+{
+	std::unique_ptr< gli::texture > tex(new gli::texture_cube(gli::load(path)));
+
+	createImage(tex->extent().x, tex->extent().y, tex->levels(),
+		format, tiling, usage, memProperty, image);
+
+	return tex;
+}
+
 void VulkanGraphic::createImage( uint32_t width,
                                  uint32_t height,
+								 uint32_t mips,
                                  VkFormat format,
                                  VkImageTiling tiling,
                                  VkImageUsageFlags usage,
@@ -1054,7 +1147,7 @@ void VulkanGraphic::createImage( uint32_t width,
    imageInfo.extent.width = width;
    imageInfo.extent.height = height;
    imageInfo.extent.depth = 1;
-   imageInfo.mipLevels = 1;
+   imageInfo.mipLevels = mips;
    imageInfo.arrayLayers = 1;
    imageInfo.format = format;
    imageInfo.tiling = tiling;
@@ -1194,7 +1287,7 @@ static auto addGeomImp( VThread::VThreadResources* resources,
    // Allocate staging buffer for both vertices and indices
    VDeleter<VkBuffer> stagingBuffer{resources->_device, vkDestroyBuffer};
    VDeleter<VkDeviceMemory> stagingBufferMemory{resources->_device, vkFreeMemory};
-   VMemAlloc hostBuffer = static_createBuffer(
+   VMemAlloc hostBuffer = VkUtils::createBuffer(
       resources->_device, resources->_memoryManager,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, combinedSize,
       VK_BUFFER_USAGE_TRANSFER_SRC_BIT, *stagingBuffer.get() );
@@ -1207,11 +1300,11 @@ static auto addGeomImp( VThread::VThreadResources* resources,
    memcpy( static_cast<char*>( data ) + vertexBufferSize, indices.data(), indexBufferSize );
    vkUnmapMemory( resources->_device, hostBuffer.memory );
 
-   static_createBuffer( resources->_device, resources->_memoryManager,
+   VkUtils::createBuffer( resources->_device, resources->_memoryManager,
                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBufferSize,
                         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                         geom->_vertexBuffer );
-   static_createBuffer( resources->_device, resources->_memoryManager,
+   VkUtils::createBuffer( resources->_device, resources->_memoryManager,
                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBufferSize,
                         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                         geom->_indexBuffer );
@@ -1270,7 +1363,7 @@ bool VulkanGraphic::createTextureImage()
 
    assert( pixels && "Error loading texture" );
 
-   createImage( width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR,
+   createImage( width, height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR,
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 _stagingImage );
@@ -1282,7 +1375,7 @@ bool VulkanGraphic::createTextureImage()
 
    stbi_image_free( pixels );
 
-   createImage( width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+   createImage( width, height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _textureImage );
 
@@ -1337,7 +1430,7 @@ bool VulkanGraphic::createTextureSampler()
 
 bool VulkanGraphic::createDepthImage()
 {
-   createImage( _swapChain->_curExtent.width, _swapChain->_curExtent.height, VK_FORMAT_D32_SFLOAT,
+   createImage( _swapChain->_curExtent.width, _swapChain->_curExtent.height, 1, VK_FORMAT_D32_SFLOAT,
                 VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _depthImage );
    createImageView( _depthImage, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, _depthImageView,
@@ -1349,6 +1442,148 @@ bool VulkanGraphic::createDepthImage()
 
    vkDeviceWaitIdle( _device );
    return true;
+}
+
+bool VulkanGraphic::createIBLTexture()
+{
+	//createCubeMap("../textures/irradiance.ktx", _irradianceTexture, _irradianceImageView, _irradianceSampler);
+	createCubeMap("../textures/radiance.ktx", _radianceTexture, _radianceImageView, _radianceSampler);
+
+	VImage::loadCubeTexture("../textures/irradiance.ktx", _radianceTexture, _device, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _memoryManager, _loadCommandPool,
+		_transferQueue.handle);
+
+	return true;
+}
+
+bool VulkanGraphic::createCubeMap( const std::string& path, VImage& img, VDeleter<VkImageView>& imgView, VDeleter<VkSampler>& imgSampler)
+{
+	VDeleter<VkBuffer> stagingBuffer{ _device, vkDestroyBuffer };
+	gli::texture_cube tex(gli::load(path) );
+
+	img._width = tex.extent().x;
+	img._height = tex.extent().y;
+	img._mips = tex.levels();
+	img._format = VK_FORMAT_R16G16B16A16_SFLOAT;
+	img._size = tex.size();
+
+	VMemAlloc hostBuffer =
+		createBuffer(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			tex.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, stagingBuffer);
+
+	void* data;
+	VK_CALL( vkMapMemory(_device, hostBuffer.memory, hostBuffer.offset, tex.size(), 0, &data) );
+	memcpy(data, tex.data(), (size_t)tex.size());
+	vkUnmapMemory(_device, hostBuffer.memory);
+
+	std::vector<VkBufferImageCopy> bufferCopyRegions;
+	size_t offset = 0;
+
+	for (uint32_t face = 0; face < 6; ++face)
+	{
+		for (uint32_t level = 0; level < tex.levels(); ++level)
+		{
+			VkBufferImageCopy bufferCopyRegion = {};
+			bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			bufferCopyRegion.imageSubresource.mipLevel = level;
+			bufferCopyRegion.imageSubresource.baseArrayLayer = face;
+			bufferCopyRegion.imageSubresource.layerCount = 1;
+			bufferCopyRegion.imageExtent.width = static_cast<uint32_t>(tex[face][level].extent().x);
+			bufferCopyRegion.imageExtent.height = static_cast<uint32_t>(tex[face][level].extent().y);
+			bufferCopyRegion.imageExtent.depth = 1;
+			bufferCopyRegion.bufferOffset = offset;
+
+			bufferCopyRegions.push_back(bufferCopyRegion);
+
+			// Increase offset into staging buffer for next level / face
+			offset += tex[face][level].size();
+		}
+	}
+
+	// Create optimal tiled target image
+	VkImageCreateInfo imageCreateInfo{};
+	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageCreateInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+	imageCreateInfo.mipLevels = tex.levels();
+	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageCreateInfo.extent = { (uint32_t) tex.extent().x, (uint32_t)tex.extent().y, 1 };
+	imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+	// Ensure that the TRANSFER_DST bit is set for staging
+	if (!(imageCreateInfo.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT))
+	{
+		imageCreateInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	}
+	// Cube faces count as array layers in Vulkan
+	imageCreateInfo.arrayLayers = 6;
+	// This flag is required for cube map images
+	imageCreateInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+	VK_CALL( vkCreateImage(_device, &imageCreateInfo, nullptr, &img) );
+
+	VkMemoryRequirements memRequirements;
+	vkGetImageMemoryRequirements(_device, img, &memRequirements);
+
+	img.setMemory(_memoryManager.alloc(memRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
+
+	VK_CALL(
+		vkBindImageMemory(_device, img, img.getMemory().memory, img.getMemory().offset));
+
+	VkImageSubresourceRange subresourceRange = {};
+	subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	subresourceRange.baseMipLevel = 0;
+	subresourceRange.levelCount = tex.levels();
+	subresourceRange.layerCount = 6;
+
+	transitionImageLayout(img, img._format, VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange, _device,
+		_loadCommandPool, _transferQueue.handle);
+
+	VkCommandBuffer commandBuffer = _loadCommandPool.alloc(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+
+	vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		static_cast<uint32_t>(bufferCopyRegions.size()), bufferCopyRegions.data());
+
+	endSingleTimeCommands(commandBuffer, _device, _transferQueue.handle, _loadCommandPool);
+
+	transitionImageLayout(img, img._format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange, _device,
+		_loadCommandPool, _transferQueue.handle);
+
+	// Create sampler
+	VkSamplerCreateInfo samplerCreateInfo = {};
+	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+	samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerCreateInfo.addressModeV = samplerCreateInfo.addressModeU;
+	samplerCreateInfo.addressModeW = samplerCreateInfo.addressModeU;
+	samplerCreateInfo.mipLodBias = 0.0f;
+	samplerCreateInfo.maxAnisotropy = 8;
+	samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+	samplerCreateInfo.minLod = 0.0f;
+	samplerCreateInfo.maxLod = (float)tex.levels();
+	samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+	VK_CALL(vkCreateSampler(_device, &samplerCreateInfo, nullptr, &imgSampler));
+
+	// Create image view
+	VkImageViewCreateInfo viewCreateInfo = {};
+	viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+	viewCreateInfo.format = img._format;
+	viewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
+	viewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	viewCreateInfo.subresourceRange.layerCount = 6;
+	viewCreateInfo.subresourceRange.levelCount = tex.levels();
+	viewCreateInfo.image = img;
+	VK_CALL(vkCreateImageView(_device, &viewCreateInfo, nullptr, &imgView));
+
+	vkDeviceWaitIdle(_device);
+
+	return true;
 }
 
 void VulkanGraphic::updateUBO( const UniformBufferObject& ubo, const PBRMaterial& pbr )

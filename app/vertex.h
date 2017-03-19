@@ -2,7 +2,7 @@
 #define VERTEX_H_
 
 #include <vulkan/vulkan.h>
-#include "../thirdParties/glm/glm.hpp"
+#include "glmIncludes.h"
 
 #include <array>
 
