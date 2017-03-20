@@ -1357,8 +1357,9 @@ bool VulkanGraphic::createUniformBuffer()
 bool VulkanGraphic::createTextureImage()
 {
    int width, height, channels;
+
    stbi_uc* pixels =
-      stbi_load( "../models/1911/Tex_0008_1.png", &width, &height, &channels, STBI_rgb_alpha );
+      stbi_load( "../textures/chalet.jpg", &width, &height, &channels, STBI_rgb_alpha );
    VkDeviceSize size = width * height * 4;
 
    assert( pixels && "Error loading texture" );
@@ -1447,9 +1448,11 @@ bool VulkanGraphic::createDepthImage()
 bool VulkanGraphic::createIBLTexture()
 {
 	//createCubeMap("../textures/irradiance.ktx", _irradianceTexture, _irradianceImageView, _irradianceSampler);
-	createCubeMap("../textures/radiance.ktx", _radianceTexture, _radianceImageView, _radianceSampler);
+	//createCubeMap("../textures/radiance.ktx", _radianceTexture, _radianceImageView, _radianceSampler);
+   VImage::loadCubeTexture("../textures/radiance.ktx", _radianceTexture, _device, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _memoryManager, _loadCommandPool,
+      _transferQueue.handle);
 
-	VImage::loadCubeTexture("../textures/irradiance.ktx", _radianceTexture, _device, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _memoryManager, _loadCommandPool,
+	VImage::loadCubeTexture("../textures/irradiance.ktx", _irradianceTexture, _device, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _memoryManager, _loadCommandPool,
 		_transferQueue.handle);
 
 	return true;
@@ -1608,7 +1611,7 @@ void VulkanGraphic::onNewFrame()
                              _imageAvailableSemaphore, VK_NULL_HANDLE, &_curFrameIdx );
    recreateSwapChainIfNotValid( res );
 
-   VK_CALL( vkWaitForFences( _device, 1, &_frameRenderedFence[ _curFrameIdx ], VK_FALSE, 1000 ) );
+   VK_CALL( vkWaitForFences( _device, 1, &_frameRenderedFence[ _curFrameIdx ], VK_FALSE, 100000000000 ) );
    vkResetFences( _device, 1, &_frameRenderedFence[ _curFrameIdx ] );
 
    _transferCommandPools[ _curFrameIdx ].freeAll( VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT );

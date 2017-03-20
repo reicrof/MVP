@@ -215,8 +215,8 @@ bool VImage::loadCubeTexture(const std::string& path, VImage& img, VkDevice devi
 	imageInfo.arrayLayers = 6;
 	imageInfo.format = format;
 	imageInfo.tiling = tiling;
-	imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-	imageInfo.usage = usage;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageInfo.usage = usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
@@ -236,17 +236,6 @@ bool VImage::loadCubeTexture(const std::string& path, VImage& img, VkDevice devi
 	// Transition to optimal destination
 	VkUtils::transitionImgLayout(img, img._format, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, commandBuffer);
-
-	// Copy
-	VkBufferImageCopy bufferCopyRegion = {};
-	bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	bufferCopyRegion.imageSubresource.mipLevel = img._mips;
-	bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
-	bufferCopyRegion.imageSubresource.layerCount = 1;
-	bufferCopyRegion.imageExtent.width = img._width;
-	bufferCopyRegion.imageExtent.height = img._height;
-	bufferCopyRegion.imageExtent.depth = 1;
-	bufferCopyRegion.bufferOffset = 0;
 
 	vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, img._image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(bufferCopyRegions.size()), bufferCopyRegions.data());
 

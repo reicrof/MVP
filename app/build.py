@@ -5,7 +5,7 @@ import getopt
 import datetime
 
 outName = "mvp"
-srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp", "MemoryPool.cpp", "vMemoryPool.cpp", "vImage.cpp", "vCommandPool.cpp", "Camera.cpp", "vThread.cpp"]
+srcFiles = [ "main.cpp", "vulkanGraphic.cpp", "swapChain.cpp", "MemoryPool.cpp", "vMemoryPool.cpp", "vImage.cpp", "vCommandPool.cpp", "Camera.cpp", "vThread.cpp", "vkUtils.cpp" ]
 coreInclude = ["../core/"]
 
 # Third parties includes
@@ -16,6 +16,8 @@ glmInclude = [ "../thirdParties/" ]
 vulkanLibPath = ["../thirdParties/vulkan/"]
 vulkanIncludePath = ["../thirdParties/vulkan/include"]
 stbIncludePath = ["../thirdParties/stb"]
+glmIncludePath = ["../thirdParties/glm"]
+gliIncludePath = ["../thirdParties/gli"]
 tinyobjIncludePath = ["../thirdParties/tiny_obj_loader"]
 commonCompilerFlags = [ "-Wall", "-Werror", ]
 cppVersion = ["-std=c++1z"]
@@ -46,7 +48,7 @@ for opt, arg in opts:
 buildStartTime = datetime.datetime.now()
 print "Building on " + platform.system() + " with " + compiler + " at " + str(buildStartTime)
 result = subprocess.call( [ compiler ] + cppVersion + stdlib + commonCompilerFlags + compilerFlags + srcFiles + ["-I"] + glfwInclude + ["-I"] + vulkanIncludePath + \
-                  ["-I"] + glmInclude + ["-I"] + stbIncludePath + ["-I"] + tinyobjIncludePath +  ["-I"] + coreInclude + ["-L"] + glfwLibPath + ["-L"] + vulkanLibPath + libs + ["-o"] + [ outName ] )
+                  ["-I"] + glmInclude + ["-I"] + stbIncludePath + ["-I"] + glmIncludePath +  ["-I"] + gliIncludePath + ["-I"] + tinyobjIncludePath +  ["-I"] + coreInclude + ["-L"] + glfwLibPath + ["-L"] + vulkanLibPath + libs + ["-o"] + [ outName ] )
 
 buildEndTime = datetime.datetime.now()
 if result != 0:
