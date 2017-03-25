@@ -21,9 +21,9 @@ class VImage
    operator VkImage();
 
    uint64_t _size;
-   unsigned _width;
-   unsigned _height;
-   unsigned _mips;
+   size_t _width;
+   size_t _height;
+   size_t _mips;
    VkFormat _format;
 
    static bool load2DTexture(const std::string& path, VImage& img, VkDevice device, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VMemoryManager& memoryManager, VCommandPool& cmdPool, VkQueue queue);

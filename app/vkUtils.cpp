@@ -1,6 +1,9 @@
 #include "vkUtils.h"
 #include "vMemoryPool.h"
 #include "vCommandPool.h"
+#include "vImage.h"
+
+#include <fstream>
 
 namespace
 {
@@ -81,6 +84,51 @@ VMemAlloc VkUtils::createBuffer(VkDevice device,
 	return alloc;
 }
 
+void VkUtils::createImage(
+    VkDevice device,
+    VMemoryManager& memoryManager,
+    uint32_t width,
+    uint32_t height,
+    uint32_t mips,
+    VkFormat format,
+    VkImageTiling tiling,
+    VkImageUsageFlags usage,
+    VkMemoryPropertyFlags memProperty,
+    VImage& img)
+{
+    VkImageCreateInfo imageInfo = {};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = width;
+    imageInfo.extent.height = height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = mips;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = format;
+    imageInfo.tiling = tiling;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    imageInfo.usage = usage;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.flags = 0;  // Optional
+
+    VK_CALL(vkCreateImage(device, &imageInfo, nullptr, &img));
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(device, img, &memRequirements);
+
+    // Free the image memory if it was already allocated
+    if (img.isAllocated())
+    {
+        memoryManager.free(img.getMemory());
+    }
+
+    img.setMemory(memoryManager.alloc(memRequirements, memProperty));
+
+    VK_CALL(
+        vkBindImageMemory(device, img, img.getMemory().memory, img.getMemory().offset));
+}
+
 VkCommandBuffer VkUtils::transitionImgLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuffer)
 {
 	VkImageMemoryBarrier barrier = {};
@@ -110,4 +158,66 @@ VkCommandBuffer VkUtils::transitionImgLayout(VkImage image, VkFormat format, VkI
 		&barrier);
 	
 	return cmdBuffer;
+}
+
+VkShaderModule VkUtils::createShaderModule(VkDevice device, const std::string& path)
+{
+	std::ifstream shaderFile{ path, std::ios::binary };
+	std::vector<char> shaderSource(std::istreambuf_iterator<char>{shaderFile},
+		std::istreambuf_iterator<char>{});
+
+    VkShaderModule shaderModule = VK_NULL_HANDLE;
+	if (shaderSource.empty())
+	{
+		std::cerr << "Cannot find shader : " << path << std::endl;
+		return shaderModule;
+	}
+
+	VkShaderModuleCreateInfo shaderModuleCreateInfo = {
+		VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, nullptr, 0, shaderSource.size(),
+		reinterpret_cast<const uint32_t*>(shaderSource.data()) };
+
+	VK_CALL(vkCreateShaderModule(device, &shaderModuleCreateInfo, nullptr, &shaderModule) );
+
+    return shaderModule;
+}
+
+VkDescriptorSetLayout VkUtils::createDescriptorSetLayout(VkDevice device, const std::vector<VkDescriptorSetLayoutBinding>& bindings)
+{
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    VkDescriptorSetLayout descSetLayout = VK_NULL_HANDLE;
+    VK_CALL(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descSetLayout));
+    return descSetLayout;
+}
+
+VkWriteDescriptorSet VkUtils::createWriteDescriptorSet(VkDescriptorSet dstSet, uint32_t dstBinding, uint32_t dstArrayEl, const VkDescriptorBufferInfo* bufInfo, uint32_t bufElCount)
+{
+    VkWriteDescriptorSet descriptorWrites = {};
+    descriptorWrites.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites.dstSet = dstSet;
+    descriptorWrites.dstBinding = dstBinding;
+    descriptorWrites.dstArrayElement = dstArrayEl;
+    descriptorWrites.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrites.descriptorCount = bufElCount;
+    descriptorWrites.pBufferInfo = bufInfo;
+
+    return descriptorWrites;
+}
+
+VkWriteDescriptorSet VkUtils::createWriteDescriptorSet(VkDescriptorSet dstSet, uint32_t dstBinding, uint32_t dstArrayEl, const VkDescriptorImageInfo * imgInfos, uint32_t imgInfosCount)
+{
+    VkWriteDescriptorSet descriptorWrites = {};
+    descriptorWrites.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites.dstSet = dstSet;
+    descriptorWrites.dstBinding = dstBinding;
+    descriptorWrites.dstArrayElement = dstArrayEl;
+    descriptorWrites.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites.descriptorCount = imgInfosCount;
+    descriptorWrites.pImageInfo = imgInfos;
+
+    return descriptorWrites;
 }

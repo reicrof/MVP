@@ -89,16 +89,6 @@ class VulkanGraphic
       VkQueue handle;
    };
 
-   VMemAlloc createBuffer( VkMemoryPropertyFlags memProperty,
-                           VkDeviceSize size,
-                           VkBufferUsageFlags usage,
-                           VDeleter<VkBuffer>& buffer );
-   static VMemAlloc createBuffer(VkDevice device,
-								VMemoryManager& memoryManager,
-								VkMemoryPropertyFlags memProperty,
-								VkDeviceSize size,
-								VkBufferUsageFlags usage,
-								VkBuffer& buffer);
    void freeBuffer( VMemAlloc& alloc );
 
    void createImage( uint32_t width,
@@ -118,7 +108,6 @@ class VulkanGraphic
 
    bool createCubeMap(const std::string& path, VImage& img, VDeleter<VkImageView>& imgView, VDeleter<VkSampler>& imgSampler);
 
-   bool createShaderModule( const std::string& shaderPath, VDeleter<VkShaderModule>& shaderModule );
    void recreateSwapChainIfNotValid( VkResult res );
 
    VDeleter<VkInstance> _instance{vkDestroyInstance};
@@ -135,8 +124,8 @@ class VulkanGraphic
    VDeleter<VkPipelineCache> _pipelineCache{_device, vkDestroyPipelineCache};
    VDeleter<VkPipelineLayout> _pipelineLayout{_device, vkDestroyPipelineLayout};
    VDeleter<VkPipeline> _graphicsPipeline{_device, vkDestroyPipeline};
-   VDeleter<VkPipelineLayout> _widgetPipelineLayout{_device, vkDestroyPipelineLayout};
    VDeleter<VkPipeline> _graphicsWidgetPipeline{_device, vkDestroyPipeline};
+   VDeleter<VkPipeline> _skyboxPipeline{ _device, vkDestroyPipeline };
    std::vector<VDeleter<VkFramebuffer>> _framebuffers;
    std::vector<VCommandPool> _graphicCommandPools;
    std::vector<VCommandPool> _transferCommandPools;

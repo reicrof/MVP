@@ -67,10 +67,10 @@ bool VImage::load2DTexture(const std::string& path, VImage& img, VkDevice device
 	VkImageCreateInfo imageInfo = {};
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent.width = img._width;
-	imageInfo.extent.height = img._height;
+	imageInfo.extent.width = (uint32_t) img._width;
+	imageInfo.extent.height = (uint32_t) img._height;
 	imageInfo.extent.depth = 1;
-	imageInfo.mipLevels = img._mips;
+	imageInfo.mipLevels = (uint32_t)img._mips;
 	imageInfo.arrayLayers = 1;
 	imageInfo.format = format;
 	imageInfo.tiling = tiling;
@@ -99,11 +99,11 @@ bool VImage::load2DTexture(const std::string& path, VImage& img, VkDevice device
 	// Copy
 	VkBufferImageCopy bufferCopyRegion = {};
 	bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	bufferCopyRegion.imageSubresource.mipLevel = img._mips;
+	bufferCopyRegion.imageSubresource.mipLevel = (uint32_t)img._mips;
 	bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
 	bufferCopyRegion.imageSubresource.layerCount = 1;
-	bufferCopyRegion.imageExtent.width = img._width;
-	bufferCopyRegion.imageExtent.height = img._height;
+	bufferCopyRegion.imageExtent.width = (uint32_t) img._width;
+	bufferCopyRegion.imageExtent.height = (uint32_t) img._height;
 	bufferCopyRegion.imageExtent.depth = 1;
 	bufferCopyRegion.bufferOffset = 0;
 
@@ -207,10 +207,10 @@ bool VImage::loadCubeTexture(const std::string& path, VImage& img, VkDevice devi
 	VkImageCreateInfo imageInfo = {};
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.extent.width = img._width;
-	imageInfo.extent.height = img._height;
+	imageInfo.extent.width = (uint32_t) img._width;
+	imageInfo.extent.height = (uint32_t) img._height;
 	imageInfo.extent.depth = 1;
-	imageInfo.mipLevels = img._mips;
+	imageInfo.mipLevels = (uint32_t) img._mips;
 	// Cube has 6 faces
 	imageInfo.arrayLayers = 6;
 	imageInfo.format = format;
@@ -237,6 +237,17 @@ bool VImage::loadCubeTexture(const std::string& path, VImage& img, VkDevice devi
 	VkUtils::transitionImgLayout(img, img._format, VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, commandBuffer);
 
+	// Copy
+	VkBufferImageCopy bufferCopyRegion = {};
+	bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	bufferCopyRegion.imageSubresource.mipLevel = (uint32_t) img._mips;
+	bufferCopyRegion.imageSubresource.baseArrayLayer = 0;
+	bufferCopyRegion.imageSubresource.layerCount = 1;
+	bufferCopyRegion.imageExtent.width = (uint32_t) img._width;
+	bufferCopyRegion.imageExtent.height = (uint32_t)img._height;
+	bufferCopyRegion.imageExtent.depth = 1;
+	bufferCopyRegion.bufferOffset = 0;
+
 	vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, img._image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(bufferCopyRegions.size()), bufferCopyRegions.data());
 
 	// Transition to optimal shader read
@@ -260,7 +271,7 @@ bool VImage::loadCubeTexture(const std::string& path, VImage& img, VkDevice devi
 	viewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
 	viewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 	viewCreateInfo.subresourceRange.layerCount = 6;
-	viewCreateInfo.subresourceRange.levelCount = img._mips;
+	viewCreateInfo.subresourceRange.levelCount = (uint32_t) img._mips;
 	viewCreateInfo.image = img;
 
 	VK_CALL(vkCreateImageView(device, &viewCreateInfo, nullptr, &img._imageView));

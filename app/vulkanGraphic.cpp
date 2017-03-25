@@ -649,70 +649,17 @@ bool VulkanGraphic::createRenderPass()
    return true;
 }
 
-bool VulkanGraphic::createShaderModule( const std::string& shaderPath,
-                                        VDeleter<VkShaderModule>& shaderModule )
-{
-   std::ifstream shaderFile{shaderPath, std::ios::binary};
-   std::vector<char> shaderSource( std::istreambuf_iterator<char>{shaderFile},
-                                   std::istreambuf_iterator<char>{} );
-   if ( shaderSource.empty() )
-   {
-      std::cerr << "Cannot find shader : " << shaderPath << std::endl;
-      return false;
-   }
-
-   VkShaderModuleCreateInfo shaderModuleCreateInfo = {
-      VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, nullptr, 0, shaderSource.size(),
-      reinterpret_cast<const uint32_t*>( shaderSource.data() )};
-
-   if ( vkCreateShaderModule( _device, &shaderModuleCreateInfo, nullptr, &shaderModule ) !=
-        VK_SUCCESS )
-   {
-      std::cerr << "Error while creating shader module for shader : " << shaderPath << std::endl;
-      return false;
-   }
-
-   return true;
-}
-
 bool VulkanGraphic::createDescriptorSetLayout()
 {
-   VkDescriptorSetLayoutBinding uboLayoutBinding = {};
-   uboLayoutBinding.binding = 0;
-   uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-   uboLayoutBinding.descriptorCount = 1;
-   uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-   uboLayoutBinding.pImmutableSamplers = nullptr;
-
-   VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-   samplerLayoutBinding.binding = 1;
-   samplerLayoutBinding.descriptorCount = 1;
-   samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-   samplerLayoutBinding.pImmutableSamplers = nullptr;
-   samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-   VkDescriptorSetLayoutBinding irradianceSamplerLayoutBinding = {};
-   irradianceSamplerLayoutBinding.binding = 2;
-   irradianceSamplerLayoutBinding.descriptorCount = 1;
-   irradianceSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-   irradianceSamplerLayoutBinding.pImmutableSamplers = nullptr;
-   irradianceSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-   VkDescriptorSetLayoutBinding radianceSamplerLayoutBinding = {};
-   radianceSamplerLayoutBinding.binding = 3;
-   radianceSamplerLayoutBinding.descriptorCount = 1;
-   radianceSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-   radianceSamplerLayoutBinding.pImmutableSamplers = nullptr;
-   radianceSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-   std::array<VkDescriptorSetLayoutBinding, 4> bindings = {
-      {uboLayoutBinding, samplerLayoutBinding, irradianceSamplerLayoutBinding, radianceSamplerLayoutBinding }};
-   VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-   layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-   layoutInfo.bindingCount = static_cast<uint32_t>( bindings.size() );
-   layoutInfo.pBindings = bindings.data();
-
-   VK_CALL( vkCreateDescriptorSetLayout( _device, &layoutInfo, nullptr, &_descriptorSetLayout ) );
+    std::vector< VkDescriptorSetLayoutBinding > bindings = 
+    {
+        // binding, descriptorType, descriptor count, stage flags, immutable samplers
+        { 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
+        { 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,  VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
+        { 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,  VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
+        { 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,  VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
+    };
+    _descriptorSetLayout.set( VkUtils::createDescriptorSetLayout(_device, bindings) );
 
    return true;
 }
@@ -752,8 +699,8 @@ bool VulkanGraphic::createPipeline()
 {
    VDeleter<VkShaderModule> vertShaderModule{_device, vkDestroyShaderModule};
    VDeleter<VkShaderModule> fragShaderModule{_device, vkDestroyShaderModule};
-   createShaderModule( "../shaders/vert.spv", vertShaderModule );
-   createShaderModule( "../shaders/frag.spv", fragShaderModule );
+   vertShaderModule.set( VkUtils::createShaderModule( _device, "../shaders/vert.spv" ) );
+   fragShaderModule.set( VkUtils::createShaderModule( _device, "../shaders/frag.spv" ) );
 
    // Vertex stage
    VkPipelineShaderStageCreateInfo vShaderStageCreateInfo = {};
@@ -852,8 +799,6 @@ bool VulkanGraphic::createPipeline()
    pipelineLayoutInfo.pSetLayouts = setLayout;
 
    VK_CALL( vkCreatePipelineLayout( _device, &pipelineLayoutInfo, nullptr, &_pipelineLayout ) );
-   VK_CALL(
-      vkCreatePipelineLayout( _device, &pipelineLayoutInfo, nullptr, &_widgetPipelineLayout ) );
 
    VkGraphicsPipelineCreateInfo pipelineInfo = {};
    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -881,8 +826,8 @@ bool VulkanGraphic::createPipeline()
 
    VDeleter<VkShaderModule> widgetvertShaderModule{_device, vkDestroyShaderModule};
    VDeleter<VkShaderModule> widgetfragShaderModule{_device, vkDestroyShaderModule};
-   createShaderModule( "../shaders/widgetVert.spv", widgetvertShaderModule );
-   createShaderModule( "../shaders/widgetFrag.spv", widgetfragShaderModule );
+   widgetvertShaderModule.set( VkUtils::createShaderModule( _device, "../shaders/widgetVert.spv" ) );
+   widgetfragShaderModule.set( VkUtils::createShaderModule( _device, "../shaders/widgetFrag.spv" ) );
 
    // Vertex stage
    VkPipelineShaderStageCreateInfo widgetvShaderStageCreateInfo = {};
@@ -908,6 +853,39 @@ bool VulkanGraphic::createPipeline()
 
    VK_CALL( vkCreateGraphicsPipelines( _device, _pipelineCache, 1, &pipelineInfo, nullptr,
                                        &_graphicsWidgetPipeline ) );
+
+
+   // Create skybox pipeline
+
+   VDeleter<VkShaderModule> skyboxvertShaderModule{ _device, vkDestroyShaderModule };
+   VDeleter<VkShaderModule> skyboxfragShaderModule{ _device, vkDestroyShaderModule };
+   skyboxvertShaderModule.set(VkUtils::createShaderModule(_device, "../shaders/skyboxVert.spv"));
+   skyboxfragShaderModule.set(VkUtils::createShaderModule(_device, "../shaders/skyboxFrag.spv"));
+
+   // Vertex stage
+   VkPipelineShaderStageCreateInfo skyboxvShaderStageCreateInfo = {};
+   skyboxvShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+   skyboxvShaderStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+   skyboxvShaderStageCreateInfo.module = skyboxvertShaderModule;
+   skyboxvShaderStageCreateInfo.pName = "main";
+
+   // Fragment stage
+   VkPipelineShaderStageCreateInfo skyboxfShaderStageInfo = {};
+   skyboxfShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+   skyboxfShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+   skyboxfShaderStageInfo.module = skyboxfragShaderModule;
+   skyboxfShaderStageInfo.pName = "main";
+
+   VkPipelineShaderStageCreateInfo skyboxStages[] = { skyboxvShaderStageCreateInfo,
+       skyboxfShaderStageInfo };
+
+   pipelineInfo.pStages = skyboxStages;
+
+   depthStencil.depthTestEnable = VK_TRUE;
+   pipelineInfo.pDepthStencilState = &depthStencil;
+
+   VK_CALL(vkCreateGraphicsPipelines(_device, _pipelineCache, 1, &pipelineInfo, nullptr,
+       &_skyboxPipeline));
 
    return true;
 }
@@ -1015,47 +993,13 @@ bool VulkanGraphic::createDescriptorSet()
    radianceImageInfo.imageView = _radianceTexture._imageView;
    radianceImageInfo.sampler = _radianceTexture._sampler;
 
-   std::array<VkWriteDescriptorSet, 4> descriptorWrites = {};
-
-   descriptorWrites[ 0 ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-   descriptorWrites[ 0 ].dstSet = _descriptorSet;
-   descriptorWrites[ 0 ].dstBinding = 0;
-   descriptorWrites[ 0 ].dstArrayElement = 0;
-   descriptorWrites[ 0 ].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-   descriptorWrites[ 0 ].descriptorCount = 1;
-   descriptorWrites[ 0 ].pBufferInfo = &bufferInfo;
-   descriptorWrites[ 0 ].pImageInfo = nullptr;
-   descriptorWrites[ 0 ].pTexelBufferView = nullptr;
-
-   descriptorWrites[ 1 ].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-   descriptorWrites[ 1 ].dstSet = _descriptorSet;
-   descriptorWrites[ 1 ].dstBinding = 1;
-   descriptorWrites[ 1 ].dstArrayElement = 0;
-   descriptorWrites[ 1 ].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-   descriptorWrites[ 1 ].descriptorCount = 1;
-   descriptorWrites[ 1 ].pBufferInfo = nullptr;
-   descriptorWrites[ 1 ].pImageInfo = &imageInfo;
-   descriptorWrites[ 1 ].pTexelBufferView = nullptr;
-
-   descriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-   descriptorWrites[2].dstSet = _descriptorSet;
-   descriptorWrites[2].dstBinding = 2;
-   descriptorWrites[2].dstArrayElement = 0;
-   descriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-   descriptorWrites[2].descriptorCount = 1;
-   descriptorWrites[2].pBufferInfo = nullptr;
-   descriptorWrites[2].pImageInfo = &irradianceImageInfo;
-   descriptorWrites[2].pTexelBufferView = nullptr;
-
-   descriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-   descriptorWrites[3].dstSet = _descriptorSet;
-   descriptorWrites[3].dstBinding = 3;
-   descriptorWrites[3].dstArrayElement = 0;
-   descriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-   descriptorWrites[3].descriptorCount = 1;
-   descriptorWrites[3].pBufferInfo = nullptr;
-   descriptorWrites[3].pImageInfo = &radianceImageInfo;
-   descriptorWrites[3].pTexelBufferView = nullptr;
+   std::array<VkWriteDescriptorSet, 4> descriptorWrites =
+   {
+    VkUtils::createWriteDescriptorSet(_descriptorSet, 0, 0, &bufferInfo, 1),
+    VkUtils::createWriteDescriptorSet(_descriptorSet, 1, 0, &imageInfo, 1),
+    VkUtils::createWriteDescriptorSet(_descriptorSet, 2, 0, &irradianceImageInfo, 1),
+    VkUtils::createWriteDescriptorSet(_descriptorSet, 3, 0, &radianceImageInfo, 1)
+   };
 
    vkUpdateDescriptorSets( _device, static_cast<uint32_t>( descriptorWrites.size() ),
                            descriptorWrites.data(), 0, nullptr );
@@ -1063,115 +1007,9 @@ bool VulkanGraphic::createDescriptorSet()
    return true;
 }
 
-VMemAlloc VulkanGraphic::createBuffer( VkDevice device,
-								VMemoryManager& memoryManager,
-								VkMemoryPropertyFlags memProperty,
-								VkDeviceSize size,
-								VkBufferUsageFlags usage,
-								VkBuffer& buffer )
-{
-   VkBufferCreateInfo bufferInfo = {};
-   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-   bufferInfo.size = size;
-   bufferInfo.usage = usage;
-   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-   VK_CALL( vkCreateBuffer( device, &bufferInfo, nullptr, &buffer ) );
-
-   VkMemoryRequirements memRequirements;
-   vkGetBufferMemoryRequirements( device, buffer, &memRequirements );
-
-   const VMemAlloc alloc = memoryManager.alloc( memRequirements, memProperty );
-
-   vkBindBufferMemory( device, buffer, alloc.memory, alloc.offset );
-
-   return alloc;
-}
-
-inline VMemAlloc VulkanGraphic::createBuffer( VkMemoryPropertyFlags memProperty,
-                                              VkDeviceSize size,
-                                              VkBufferUsageFlags usage,
-                                              VDeleter<VkBuffer>& buffer )
-{
-   VkBufferCreateInfo bufferInfo = {};
-   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-   bufferInfo.size = size;
-   bufferInfo.usage = usage;
-   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-   VK_CALL( vkCreateBuffer( _device, &bufferInfo, nullptr, &buffer ) );
-
-   VkMemoryRequirements memRequirements;
-   vkGetBufferMemoryRequirements( _device, buffer, &memRequirements );
-
-   const VMemAlloc alloc = _memoryManager.alloc( memRequirements, memProperty );
-
-   vkBindBufferMemory( _device, buffer, alloc.memory, alloc.offset );
-
-   return alloc;
-}
-
 void VulkanGraphic::freeBuffer( VMemAlloc& alloc )
 {
    _memoryManager.free( alloc );
-}
-
-std::unique_ptr< gli::texture > VulkanGraphic::createImage(
-	const std::string& path,
-	VkFormat format,
-	VkImageTiling tiling,
-	VkImageUsageFlags usage,
-	VkMemoryPropertyFlags memProperty,
-	VImage& image)
-{
-	std::unique_ptr< gli::texture > tex(new gli::texture_cube(gli::load(path)));
-
-	createImage(tex->extent().x, tex->extent().y, tex->levels(),
-		format, tiling, usage, memProperty, image);
-
-	return tex;
-}
-
-void VulkanGraphic::createImage( uint32_t width,
-                                 uint32_t height,
-								 uint32_t mips,
-                                 VkFormat format,
-                                 VkImageTiling tiling,
-                                 VkImageUsageFlags usage,
-                                 VkMemoryPropertyFlags memProperty,
-                                 VImage& image )
-{
-   VkImageCreateInfo imageInfo = {};
-   imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-   imageInfo.imageType = VK_IMAGE_TYPE_2D;
-   imageInfo.extent.width = width;
-   imageInfo.extent.height = height;
-   imageInfo.extent.depth = 1;
-   imageInfo.mipLevels = mips;
-   imageInfo.arrayLayers = 1;
-   imageInfo.format = format;
-   imageInfo.tiling = tiling;
-   imageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-   imageInfo.usage = usage;
-   imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-   imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-   imageInfo.flags = 0;  // Optional
-
-   VK_CALL( vkCreateImage( _device, &imageInfo, nullptr, &image ) );
-
-   VkMemoryRequirements memRequirements;
-   vkGetImageMemoryRequirements( _device, image, &memRequirements );
-
-   // Free the image memory if it was already allocated
-   if ( image.isAllocated() )
-   {
-      _memoryManager.free( image.getMemory() );
-   }
-
-   image.setMemory( _memoryManager.alloc( memRequirements, memProperty ) );
-
-   VK_CALL(
-      vkBindImageMemory( _device, image, image.getMemory().memory, image.getMemory().offset ) );
 }
 
 VkCommandBuffer VulkanGraphic::createCommandBuffers( unsigned frameIdx )
@@ -1344,12 +1182,11 @@ bool VulkanGraphic::createUniformBuffer()
 {
    VkDeviceSize bufferSize = sizeof( UniformBufferObject ) + sizeof( PBRMaterial );
 
-   _uniformStagingBufferMemory =
-      createBuffer( VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                    bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, _uniformStagingBuffer );
-   createBuffer( VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize,
-                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                 _uniformBuffer );
+   _uniformStagingBufferMemory = VkUtils::createBuffer(_device, _memoryManager,
+       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, *_uniformStagingBuffer.get());
+
+   VkUtils::createBuffer( _device, _memoryManager, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, *_uniformBuffer.get() );
 
    return true;
 }
@@ -1364,7 +1201,7 @@ bool VulkanGraphic::createTextureImage()
 
    assert( pixels && "Error loading texture" );
 
-   createImage( width, height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR,
+   VkUtils::createImage( _device, _memoryManager, width, height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR,
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 _stagingImage );
@@ -1376,7 +1213,7 @@ bool VulkanGraphic::createTextureImage()
 
    stbi_image_free( pixels );
 
-   createImage( width, height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+   VkUtils::createImage(_device, _memoryManager, width, height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _textureImage );
 
@@ -1431,7 +1268,7 @@ bool VulkanGraphic::createTextureSampler()
 
 bool VulkanGraphic::createDepthImage()
 {
-   createImage( _swapChain->_curExtent.width, _swapChain->_curExtent.height, 1, VK_FORMAT_D32_SFLOAT,
+    VkUtils::createImage(_device, _memoryManager, _swapChain->_curExtent.width, _swapChain->_curExtent.height, 1, VK_FORMAT_D32_SFLOAT,
                 VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _depthImage );
    createImageView( _depthImage, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, _depthImageView,
@@ -1469,9 +1306,9 @@ bool VulkanGraphic::createCubeMap( const std::string& path, VImage& img, VDelete
 	img._format = VK_FORMAT_R16G16B16A16_SFLOAT;
 	img._size = tex.size();
 
-	VMemAlloc hostBuffer =
-		createBuffer(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-			tex.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, stagingBuffer);
+	VMemAlloc hostBuffer = VkUtils::createBuffer( _device, _memoryManager, 
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, tex.size(), 
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, *stagingBuffer.get() );
 
 	void* data;
 	VK_CALL( vkMapMemory(_device, hostBuffer.memory, hostBuffer.offset, tex.size(), 0, &data) );
@@ -1507,7 +1344,7 @@ bool VulkanGraphic::createCubeMap( const std::string& path, VImage& img, VDelete
 	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
 	imageCreateInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-	imageCreateInfo.mipLevels = tex.levels();
+	imageCreateInfo.mipLevels = (uint32_t)tex.levels();
 	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -1537,7 +1374,7 @@ bool VulkanGraphic::createCubeMap( const std::string& path, VImage& img, VDelete
 	VkImageSubresourceRange subresourceRange = {};
 	subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	subresourceRange.baseMipLevel = 0;
-	subresourceRange.levelCount = tex.levels();
+	subresourceRange.levelCount = (uint32_t)tex.levels();
 	subresourceRange.layerCount = 6;
 
 	transitionImageLayout(img, img._format, VK_IMAGE_LAYOUT_UNDEFINED,
@@ -1580,7 +1417,7 @@ bool VulkanGraphic::createCubeMap( const std::string& path, VImage& img, VDelete
 	viewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
 	viewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 	viewCreateInfo.subresourceRange.layerCount = 6;
-	viewCreateInfo.subresourceRange.levelCount = tex.levels();
+	viewCreateInfo.subresourceRange.levelCount = (uint32_t) tex.levels();
 	viewCreateInfo.image = img;
 	VK_CALL(vkCreateImageView(_device, &viewCreateInfo, nullptr, &imgView));
 

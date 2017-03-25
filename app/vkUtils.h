@@ -1,6 +1,7 @@
 #ifndef VK_UTILS_H_
 #define VK_UTILS_H_
 #include <vulkan/vulkan.h>
+#include <vector>
 #include <functional>
 #include <assert.h>
 #include <iostream>
@@ -74,6 +75,7 @@ class VDeleter
 struct VMemAlloc;
 class VMemoryManager;
 class VCommandPool;
+class VImage;
 
 namespace VkUtils
 {
@@ -100,12 +102,46 @@ namespace VkUtils
 		VkBufferUsageFlags usage,
 		VkBuffer& buffer);
 
+    void createImage(
+        VkDevice device,
+        VMemoryManager& memoryManager,
+        uint32_t width,
+        uint32_t height,
+        uint32_t mips,
+        VkFormat format,
+        VkImageTiling tiling,
+        VkImageUsageFlags usage,
+        VkMemoryPropertyFlags memProperty,
+        VImage& img);
+
 	VkCommandBuffer transitionImgLayout(
 		VkImage image,
 		VkFormat format,
 		VkImageLayout oldLayout,
 		VkImageLayout newLayout,
 		VkCommandBuffer cmdBuffer);
+
+	VkShaderModule createShaderModule(
+		VkDevice device,
+		const std::string& path);
+
+    VkDescriptorSetLayout createDescriptorSetLayout(
+        VkDevice device,
+        const std::vector< VkDescriptorSetLayoutBinding >& bindings);
+
+    VkWriteDescriptorSet createWriteDescriptorSet(
+        VkDescriptorSet dstSet,
+        uint32_t dstBinding,
+        uint32_t dstArrayEl,
+        const VkDescriptorBufferInfo* bufInfo,
+        uint32_t bufElCount);
+
+    VkWriteDescriptorSet createWriteDescriptorSet(
+        VkDescriptorSet dstSet,
+        uint32_t dstBinding,
+        uint32_t dstArrayEl,
+        const VkDescriptorImageInfo* bufInfo,
+        uint32_t bufElCount);
 }
 
 #endif  // !VK_UTILS_H_
