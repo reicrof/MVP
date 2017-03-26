@@ -23,19 +23,19 @@ T clamp( T val, T min, T max )
    return temp > max ? max : temp;
 }
 
-constexpr size_t kilobytes(size_t count)
+constexpr size_t kilobytes( size_t count )
 {
-	return count * 1024;
+   return count * 1024;
 }
 
-constexpr size_t megabytes(size_t count)
+constexpr size_t megabytes( size_t count )
 {
-	return kilobytes(count) * 1024;
+   return kilobytes( count ) * 1024;
 }
 
-constexpr size_t gigabytes(size_t count)
+constexpr size_t gigabytes( size_t count )
 {
-	return megabytes(count) * 1024;
+   return megabytes( count ) * 1024;
 }
 
 #endif  // UTILS_H_

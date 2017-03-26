@@ -79,69 +79,62 @@ class VImage;
 
 namespace VkUtils
 {
-	void endCmdBufferAndSubmit(
-		VkCommandBuffer cmdBuf,
-		VkQueue& queue,
-		uint32_t waitSemCount = 0,
-		VkSemaphore* waitSem = nullptr,
-		uint32_t signalSemCount = 0,
-		VkSemaphore* signalSem = nullptr,
-		VkFence fenceToSignal = VK_NULL_HANDLE);
+void endCmdBufferAndSubmit( VkCommandBuffer cmdBuf,
+                            VkQueue& queue,
+                            uint32_t waitSemCount = 0,
+                            VkSemaphore* waitSem = nullptr,
+                            uint32_t signalSemCount = 0,
+                            VkSemaphore* signalSem = nullptr,
+                            VkFence fenceToSignal = VK_NULL_HANDLE );
 
-	VkCommandBuffer copyBuffer(
-		VkCommandBuffer cmdBuffer,
-		VkBuffer source,
-		VkBuffer dest,
-		VkDeviceSize size );
+VkCommandBuffer copyBuffer( VkCommandBuffer cmdBuffer,
+                            VkBuffer source,
+                            VkBuffer dest,
+                            VkDeviceSize size );
 
-	VMemAlloc createBuffer(
-		VkDevice device,
-		VMemoryManager& memoryManager,
-		VkMemoryPropertyFlags memProperty,
-		VkDeviceSize size,
-		VkBufferUsageFlags usage,
-		VkBuffer& buffer);
+VMemAlloc createBuffer( VkDevice device,
+                        VMemoryManager& memoryManager,
+                        VkMemoryPropertyFlags memProperty,
+                        VkDeviceSize size,
+                        VkBufferUsageFlags usage,
+                        VkBuffer& buffer );
 
-    void createImage(
-        VkDevice device,
-        VMemoryManager& memoryManager,
-        uint32_t width,
-        uint32_t height,
-        uint32_t mips,
-        VkFormat format,
-        VkImageTiling tiling,
-        VkImageUsageFlags usage,
-        VkMemoryPropertyFlags memProperty,
-        VImage& img);
+void createImage( VkDevice device,
+                  VMemoryManager& memoryManager,
+                  uint32_t width,
+                  uint32_t height,
+                  uint32_t mips,
+                  VkFormat format,
+                  VkImageTiling tiling,
+                  VkImageUsageFlags usage,
+                  VkMemoryPropertyFlags memProperty,
+                  VImage& img );
 
-	VkCommandBuffer transitionImgLayout(
-		VkImage image,
-		VkFormat format,
-		VkImageLayout oldLayout,
-		VkImageLayout newLayout,
-		VkCommandBuffer cmdBuffer);
+VkCommandBuffer transitionImgLayout( VkImage image,
+                                     VkFormat format,
+                                     VkImageLayout oldLayout,
+                                     VkImageLayout newLayout,
+                                     VkCommandBuffer cmdBuffer );
 
-	VkShaderModule createShaderModule(
-		VkDevice device,
-		const std::string& path);
+VkShaderModule createShaderModule( VkDevice device, const std::string& path );
 
-    VkDescriptorSetLayout createDescriptorSetLayout(
-        VkDevice device,
-        const std::vector< VkDescriptorSetLayoutBinding >& bindings);
+VkDescriptorSetLayout createDescriptorSetLayout(
+   VkDevice device,
+   const std::vector<VkDescriptorSetLayoutBinding>& bindings );
 
-    VkWriteDescriptorSet createWriteDescriptorSet(
-        VkDescriptorSet dstSet,
-        uint32_t dstBinding,
-        uint32_t dstArrayEl,
-        const VkDescriptorBufferInfo* bufInfo,
-        uint32_t bufElCount);
+VkWriteDescriptorSet createWriteDescriptorSet( VkDescriptorSet dstSet,
+                                               uint32_t dstBinding,
+                                               uint32_t dstArrayEl,
+                                               const VkDescriptorBufferInfo* bufInfo,
+                                               uint32_t bufElCount );
 
-    VkWriteDescriptorSet createWriteDescriptorSet(
-        VkDescriptorSet dstSet,
-        uint32_t dstBinding,
-        uint32_t dstArrayEl,
-        const VkDescriptorImageInfo* bufInfo,
-        uint32_t bufElCount);
+VkWriteDescriptorSet createWriteDescriptorSet( VkDescriptorSet dstSet,
+                                               uint32_t dstBinding,
+                                               uint32_t dstArrayEl,
+                                               const VkDescriptorImageInfo* bufInfo,
+                                               uint32_t bufElCount );
+
+VkFence createFence( VkDevice device, VkFenceCreateFlags flag );
 }
 
 #endif  // !VK_UTILS_H_

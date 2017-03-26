@@ -26,17 +26,34 @@ class VImage
    size_t _mips;
    VkFormat _format;
 
-   static bool load2DTexture(const std::string& path, VImage& img, VkDevice device, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VMemoryManager& memoryManager, VCommandPool& cmdPool, VkQueue queue);
-   static bool loadCubeTexture(const std::string& path, VImage& img, VkDevice device, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VMemoryManager& memoryManager, VCommandPool& cmdPool, VkQueue queue);
-		
+   static bool load2DTexture( const std::string& path,
+                              VImage& img,
+                              VkDevice device,
+                              VkFormat format,
+                              VkImageTiling tiling,
+                              VkImageUsageFlags usage,
+                              VMemoryManager& memoryManager,
+                              VCommandPool& cmdPool,
+                              VkQueue queue );
+   static bool loadCubeTexture( const std::string& path,
+                                VImage& img,
+                                VkDevice device,
+                                VkFormat format,
+                                VkImageTiling tiling,
+                                VkImageUsageFlags usage,
+                                VMemoryManager& memoryManager,
+                                VCommandPool& cmdPool,
+                                VkQueue queue );
 
- 
-VDeleter<VkImage> _image;
-VDeleter<VkImageView> _imageView;
+
+
+   VDeleter<VkImage> _image;
+   VDeleter<VkImageView> _imageView;
    VDeleter<VkSampler> _sampler;
-private:
+
+  private:
    VMemAlloc _memAlloc;
-   std::unique_ptr< gli::texture > _gliTex;
+   std::unique_ptr<gli::texture> _gliTex;
 };
 
 #endif  // _VIMAGE_H_

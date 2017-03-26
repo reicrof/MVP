@@ -84,7 +84,7 @@ VMemoryPool::operator VkDeviceMemory()
 
 ////////////////////////////////////////
 
-VMemoryManager::VMemoryManager() :_physDevice(VK_NULL_HANDLE), _device(VK_NULL_HANDLE)
+VMemoryManager::VMemoryManager() : _physDevice( VK_NULL_HANDLE ), _device( VK_NULL_HANDLE )
 {
 }
 
@@ -94,11 +94,10 @@ VMemoryManager::VMemoryManager( const VkPhysicalDevice& physDevice,
 {
 }
 
-void VMemoryManager::init(const VkPhysicalDevice& physDevice,
-	const VkDevice& device)
+void VMemoryManager::init( const VkPhysicalDevice& physDevice, const VkDevice& device )
 {
-	_physDevice = physDevice;
-	_device = device;
+   _physDevice = physDevice;
+   _device = device;
 }
 
 VMemAlloc VMemoryManager::alloc( const VkMemoryRequirements& requirements,
@@ -166,7 +165,7 @@ void VMemoryManager::free( VMemAlloc& alloc )
          if ( *pool.get() == alloc.memory )
          {
             pool->free( alloc );
-			return;
+            return;
          }
       }
    }

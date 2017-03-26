@@ -115,7 +115,8 @@ SwapChain::SwapChain( const VkPhysicalDevice& physDevice,
    createInfo.clipped = VK_TRUE;
    createInfo.oldSwapchain = oldSwapChain;
 
-   VK_CALL( vkCreateSwapchainKHR( logicalDevice, &createInfo, nullptr, _handle.get() ) );
+   VK_CALL( vkCreateSwapchainKHR( logicalDevice, &createInfo, nullptr, &_handle ) );
+
 
    vkGetSwapchainImagesKHR( logicalDevice, _handle, &_imageCount, nullptr );
    _images.resize( _imageCount );
@@ -139,6 +140,7 @@ SwapChain::SwapChain( const VkPhysicalDevice& physDevice,
    for ( uint32_t i = 0; i < _imageCount; ++i )
    {
       imgCreateInfo.image = _images[ i ];
-      VK_CALL( vkCreateImageView( logicalDevice, &imgCreateInfo, nullptr, _imageViews[ i ].get() ) );
+      VK_CALL(
+         vkCreateImageView( logicalDevice, &imgCreateInfo, nullptr, _imageViews[ i ].get() ) );
    }
 }

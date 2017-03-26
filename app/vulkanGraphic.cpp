@@ -18,7 +18,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-const std::vector<const char*> VALIDATION_LAYERS = {"VK_LAYER_LUNARG_standard_validation"};
+const std::vector<const char*> VALIDATION_LAYERS = {
+   "VK_LAYER_LUNARG_standard_validation", "VK_LAYER_GOOGLE_threading", "VK_LAYER_LUNARG_swapchain"};
 
 const std::vector<const char*> DEVICE_EXTENSIONS = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
@@ -66,7 +67,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback( VkDebugReportFlagsEXT flags
 {
    std::cerr << "validation layer: " << msg << std::endl;
    ( *static_cast<std::ofstream*>( userData ) ) << msg << std::endl;
-    return VK_FALSE;
+   return VK_FALSE;
 }
 
 namespace
@@ -299,36 +300,36 @@ void transitionImageLayout( VkImage image,
    endSingleTimeCommands( commandBuffer, device, queue, commandPool );
 }
 
-void transitionImageLayout(VkImage image,
-	VkFormat format,
-	VkImageLayout oldLayout,
-	VkImageLayout newLayout,
-	VkImageSubresourceRange subresource,
-	VDeleter<VkDevice>& device,
-	VCommandPool& commandPool,
-	VkQueue& queue)
+void transitionImageLayout( VkImage image,
+                            VkFormat format,
+                            VkImageLayout oldLayout,
+                            VkImageLayout newLayout,
+                            VkImageSubresourceRange subresource,
+                            VDeleter<VkDevice>& device,
+                            VCommandPool& commandPool,
+                            VkQueue& queue )
 {
-	VkCommandBuffer commandBuffer = commandPool.alloc(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+   VkCommandBuffer commandBuffer = commandPool.alloc( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
 
-	VkImageMemoryBarrier barrier = {};
-	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.oldLayout = oldLayout;
-	barrier.newLayout = newLayout;
-	// Queue family ownership
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   VkImageMemoryBarrier barrier = {};
+   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+   barrier.oldLayout = oldLayout;
+   barrier.newLayout = newLayout;
+   // Queue family ownership
+   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
-	barrier.image = image;
-	barrier.subresourceRange = subresource;
+   barrier.image = image;
+   barrier.subresourceRange = subresource;
 
-	barrier.srcAccessMask = vkImageLayoutToAccessFlags(oldLayout);
-	barrier.dstAccessMask = vkImageLayoutToAccessFlags(newLayout);
+   barrier.srcAccessMask = vkImageLayoutToAccessFlags( oldLayout );
+   barrier.dstAccessMask = vkImageLayoutToAccessFlags( newLayout );
 
-	vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
-		&barrier);
+   vkCmdPipelineBarrier( commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                         &barrier );
 
-	endSingleTimeCommands(commandBuffer, device, queue, commandPool);
+   endSingleTimeCommands( commandBuffer, device, queue, commandPool );
 }
 
 void createImageView( VkImage image,
@@ -651,15 +652,15 @@ bool VulkanGraphic::createRenderPass()
 
 bool VulkanGraphic::createDescriptorSetLayout()
 {
-    std::vector< VkDescriptorSetLayoutBinding > bindings = 
-    {
-        // binding, descriptorType, descriptor count, stage flags, immutable samplers
-        { 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-        { 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,  VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-        { 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,  VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-        { 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,  VK_SHADER_STAGE_FRAGMENT_BIT, nullptr },
-    };
-    _descriptorSetLayout.set( VkUtils::createDescriptorSetLayout(_device, bindings) );
+   std::vector<VkDescriptorSetLayoutBinding> bindings = {
+      // binding, descriptorType, descriptor count, stage flags, immutable samplers
+      {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1,
+       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+      {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+      {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+      {3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+   };
+   _descriptorSetLayout.set( VkUtils::createDescriptorSetLayout( _device, bindings ) );
 
    return true;
 }
@@ -826,8 +827,10 @@ bool VulkanGraphic::createPipeline()
 
    VDeleter<VkShaderModule> widgetvertShaderModule{_device, vkDestroyShaderModule};
    VDeleter<VkShaderModule> widgetfragShaderModule{_device, vkDestroyShaderModule};
-   widgetvertShaderModule.set( VkUtils::createShaderModule( _device, "../shaders/widgetVert.spv" ) );
-   widgetfragShaderModule.set( VkUtils::createShaderModule( _device, "../shaders/widgetFrag.spv" ) );
+   widgetvertShaderModule.set(
+      VkUtils::createShaderModule( _device, "../shaders/widgetVert.spv" ) );
+   widgetfragShaderModule.set(
+      VkUtils::createShaderModule( _device, "../shaders/widgetFrag.spv" ) );
 
    // Vertex stage
    VkPipelineShaderStageCreateInfo widgetvShaderStageCreateInfo = {};
@@ -857,10 +860,12 @@ bool VulkanGraphic::createPipeline()
 
    // Create skybox pipeline
 
-   VDeleter<VkShaderModule> skyboxvertShaderModule{ _device, vkDestroyShaderModule };
-   VDeleter<VkShaderModule> skyboxfragShaderModule{ _device, vkDestroyShaderModule };
-   skyboxvertShaderModule.set(VkUtils::createShaderModule(_device, "../shaders/skyboxVert.spv"));
-   skyboxfragShaderModule.set(VkUtils::createShaderModule(_device, "../shaders/skyboxFrag.spv"));
+   VDeleter<VkShaderModule> skyboxvertShaderModule{_device, vkDestroyShaderModule};
+   VDeleter<VkShaderModule> skyboxfragShaderModule{_device, vkDestroyShaderModule};
+   skyboxvertShaderModule.set(
+      VkUtils::createShaderModule( _device, "../shaders/skyboxVert.spv" ) );
+   skyboxfragShaderModule.set(
+      VkUtils::createShaderModule( _device, "../shaders/skyboxFrag.spv" ) );
 
    // Vertex stage
    VkPipelineShaderStageCreateInfo skyboxvShaderStageCreateInfo = {};
@@ -876,16 +881,16 @@ bool VulkanGraphic::createPipeline()
    skyboxfShaderStageInfo.module = skyboxfragShaderModule;
    skyboxfShaderStageInfo.pName = "main";
 
-   VkPipelineShaderStageCreateInfo skyboxStages[] = { skyboxvShaderStageCreateInfo,
-       skyboxfShaderStageInfo };
+   VkPipelineShaderStageCreateInfo skyboxStages[] = {skyboxvShaderStageCreateInfo,
+                                                     skyboxfShaderStageInfo};
 
    pipelineInfo.pStages = skyboxStages;
 
    depthStencil.depthTestEnable = VK_TRUE;
    pipelineInfo.pDepthStencilState = &depthStencil;
 
-   VK_CALL(vkCreateGraphicsPipelines(_device, _pipelineCache, 1, &pipelineInfo, nullptr,
-       &_skyboxPipeline));
+   VK_CALL( vkCreateGraphicsPipelines( _device, _pipelineCache, 1, &pipelineInfo, nullptr,
+                                       &_skyboxPipeline ) );
 
    return true;
 }
@@ -923,7 +928,7 @@ bool VulkanGraphic::createCommandPool()
    _graphicCommandPools.resize( _swapChain->_imageCount );
    for ( auto& p : _graphicCommandPools )
    {
-      p.init( *_device.get(), 5, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, _graphicQueue.familyIndex );
+      p.init( _device, 5, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, _graphicQueue.familyIndex );
    }
 
    // Create one transfer command pool per swapchain image.
@@ -934,10 +939,10 @@ bool VulkanGraphic::createCommandPool()
    _transferCommandPools.resize( _swapChain->_imageCount );
    for ( auto& p : _transferCommandPools )
    {
-      p.init( *_device.get(), 5, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, _transferQueue.familyIndex );
+      p.init( _device, 5, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, _transferQueue.familyIndex );
    }
 
-   _loadCommandPool.init( *_device.get(), 10, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+   _loadCommandPool.init( _device, 10, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
                           _transferQueue.familyIndex );
 
    return true;
@@ -993,13 +998,11 @@ bool VulkanGraphic::createDescriptorSet()
    radianceImageInfo.imageView = _radianceTexture._imageView;
    radianceImageInfo.sampler = _radianceTexture._sampler;
 
-   std::array<VkWriteDescriptorSet, 4> descriptorWrites =
-   {
-    VkUtils::createWriteDescriptorSet(_descriptorSet, 0, 0, &bufferInfo, 1),
-    VkUtils::createWriteDescriptorSet(_descriptorSet, 1, 0, &imageInfo, 1),
-    VkUtils::createWriteDescriptorSet(_descriptorSet, 2, 0, &irradianceImageInfo, 1),
-    VkUtils::createWriteDescriptorSet(_descriptorSet, 3, 0, &radianceImageInfo, 1)
-   };
+   std::array<VkWriteDescriptorSet, 4> descriptorWrites = {
+      VkUtils::createWriteDescriptorSet( _descriptorSet, 0, 0, &bufferInfo, 1 ),
+      VkUtils::createWriteDescriptorSet( _descriptorSet, 1, 0, &imageInfo, 1 ),
+      VkUtils::createWriteDescriptorSet( _descriptorSet, 2, 0, &irradianceImageInfo, 1 ),
+      VkUtils::createWriteDescriptorSet( _descriptorSet, 3, 0, &radianceImageInfo, 1 )};
 
    vkUpdateDescriptorSets( _device, static_cast<uint32_t>( descriptorWrites.size() ),
                            descriptorWrites.data(), 0, nullptr );
@@ -1059,9 +1062,9 @@ VkCommandBuffer VulkanGraphic::createCommandBuffers( unsigned frameIdx )
       vkCmdDrawIndexed( commandBuffer, _geoms[ i ]._indexCount, 1, 0, 0, 0 );
    }
 
-   //vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsWidgetPipeline );
+   // vkCmdBindPipeline( commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsWidgetPipeline );
 
-   //for ( size_t i = 0; i < _geomsToDraw; ++i )
+   // for ( size_t i = 0; i < _geomsToDraw; ++i )
    //{
    //   VkBuffer vertexBuffers[] = {_geoms[ i ]._vertexBuffer};
    //   VkDeviceSize offsets[] = {0};
@@ -1109,11 +1112,7 @@ static auto addGeomImp( VThread::VThreadResources* resources,
 {
    // Create fence for syncronization
    VDeleter<VkFence> fence{resources->_device, vkDestroyFence};
-   VkFenceCreateInfo createInfo = {};
-   createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-   createInfo.pNext = nullptr;
-   createInfo.flags = 0;
-   vkCreateFence( resources->_device, &createInfo, nullptr, &fence );
+   fence.set( VkUtils::createFence( resources->_device, 0 ) );
 
    geom->_verticesCount = static_cast<uint32_t>( vertices.size() );
    geom->_indexCount = static_cast<uint32_t>( indices.size() );
@@ -1139,13 +1138,13 @@ static auto addGeomImp( VThread::VThreadResources* resources,
    vkUnmapMemory( resources->_device, hostBuffer.memory );
 
    VkUtils::createBuffer( resources->_device, resources->_memoryManager,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBufferSize,
-                        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                        geom->_vertexBuffer );
+                          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBufferSize,
+                          VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                          geom->_vertexBuffer );
    VkUtils::createBuffer( resources->_device, resources->_memoryManager,
-                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBufferSize,
-                        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                        geom->_indexBuffer );
+                          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBufferSize,
+                          VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                          geom->_indexBuffer );
 
 
    VkCommandBuffer commandBuffer =
@@ -1182,11 +1181,14 @@ bool VulkanGraphic::createUniformBuffer()
 {
    VkDeviceSize bufferSize = sizeof( UniformBufferObject ) + sizeof( PBRMaterial );
 
-   _uniformStagingBufferMemory = VkUtils::createBuffer(_device, _memoryManager,
-       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, *_uniformStagingBuffer.get());
+   _uniformStagingBufferMemory = VkUtils::createBuffer(
+      _device, _memoryManager,
+      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, bufferSize,
+      VK_BUFFER_USAGE_TRANSFER_SRC_BIT, *_uniformStagingBuffer.get() );
 
    VkUtils::createBuffer( _device, _memoryManager, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, bufferSize,
-                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, *_uniformBuffer.get() );
+                          VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                          *_uniformBuffer.get() );
 
    return true;
 }
@@ -1201,10 +1203,10 @@ bool VulkanGraphic::createTextureImage()
 
    assert( pixels && "Error loading texture" );
 
-   VkUtils::createImage( _device, _memoryManager, width, height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_LINEAR,
-                VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                _stagingImage );
+   VkUtils::createImage( _device, _memoryManager, width, height, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                         VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                         _stagingImage );
 
    void* data;
    vkMapMemory( _device, _stagingImage.getMemory().memory, 0, size, 0, &data );
@@ -1213,9 +1215,10 @@ bool VulkanGraphic::createTextureImage()
 
    stbi_image_free( pixels );
 
-   VkUtils::createImage(_device, _memoryManager, width, height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _textureImage );
+   VkUtils::createImage( _device, _memoryManager, width, height, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                         VK_IMAGE_TILING_OPTIMAL,
+                         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _textureImage );
 
    transitionImageLayout( _stagingImage, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_PREINITIALIZED,
                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, _device, _loadCommandPool,
@@ -1268,9 +1271,10 @@ bool VulkanGraphic::createTextureSampler()
 
 bool VulkanGraphic::createDepthImage()
 {
-    VkUtils::createImage(_device, _memoryManager, _swapChain->_curExtent.width, _swapChain->_curExtent.height, 1, VK_FORMAT_D32_SFLOAT,
-                VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _depthImage );
+   VkUtils::createImage( _device, _memoryManager, _swapChain->_curExtent.width,
+                         _swapChain->_curExtent.height, 1, VK_FORMAT_D32_SFLOAT,
+                         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _depthImage );
    createImageView( _depthImage, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, _depthImageView,
                     _device );
 
@@ -1284,146 +1288,156 @@ bool VulkanGraphic::createDepthImage()
 
 bool VulkanGraphic::createIBLTexture()
 {
-	//createCubeMap("../textures/irradiance.ktx", _irradianceTexture, _irradianceImageView, _irradianceSampler);
-	//createCubeMap("../textures/radiance.ktx", _radianceTexture, _radianceImageView, _radianceSampler);
-   VImage::loadCubeTexture("../textures/radiance.ktx", _radianceTexture, _device, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _memoryManager, _loadCommandPool,
-      _transferQueue.handle);
+   VImage::loadCubeTexture( "../textures/radiance.ktx", _radianceTexture, _device,
+                            VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _memoryManager,
+                            _loadCommandPool, _transferQueue.handle );
 
-	VImage::loadCubeTexture("../textures/irradiance.ktx", _irradianceTexture, _device, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _memoryManager, _loadCommandPool,
-		_transferQueue.handle);
+   VImage::loadCubeTexture( "../textures/irradiance.ktx", _irradianceTexture, _device,
+                            VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, _memoryManager,
+                            _loadCommandPool, _transferQueue.handle );
 
-	return true;
+   return true;
 }
 
-bool VulkanGraphic::createCubeMap( const std::string& path, VImage& img, VDeleter<VkImageView>& imgView, VDeleter<VkSampler>& imgSampler)
+bool VulkanGraphic::createCubeMap( const std::string& path,
+                                   VImage& img,
+                                   VDeleter<VkImageView>& imgView,
+                                   VDeleter<VkSampler>& imgSampler )
 {
-	VDeleter<VkBuffer> stagingBuffer{ _device, vkDestroyBuffer };
-	gli::texture_cube tex(gli::load(path) );
+   VDeleter<VkBuffer> stagingBuffer{_device, vkDestroyBuffer};
+   gli::texture_cube tex( gli::load( path ) );
 
-	img._width = tex.extent().x;
-	img._height = tex.extent().y;
-	img._mips = tex.levels();
-	img._format = VK_FORMAT_R16G16B16A16_SFLOAT;
-	img._size = tex.size();
+   img._width = tex.extent().x;
+   img._height = tex.extent().y;
+   img._mips = tex.levels();
+   img._format = VK_FORMAT_R16G16B16A16_SFLOAT;
+   img._size = tex.size();
 
-	VMemAlloc hostBuffer = VkUtils::createBuffer( _device, _memoryManager, 
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, tex.size(), 
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT, *stagingBuffer.get() );
+   VMemAlloc hostBuffer = VkUtils::createBuffer(
+      _device, _memoryManager,
+      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, tex.size(),
+      VK_BUFFER_USAGE_TRANSFER_SRC_BIT, *stagingBuffer.get() );
 
-	void* data;
-	VK_CALL( vkMapMemory(_device, hostBuffer.memory, hostBuffer.offset, tex.size(), 0, &data) );
-	memcpy(data, tex.data(), (size_t)tex.size());
-	vkUnmapMemory(_device, hostBuffer.memory);
+   void* data;
+   VK_CALL( vkMapMemory( _device, hostBuffer.memory, hostBuffer.offset, tex.size(), 0, &data ) );
+   memcpy( data, tex.data(), (size_t)tex.size() );
+   vkUnmapMemory( _device, hostBuffer.memory );
 
-	std::vector<VkBufferImageCopy> bufferCopyRegions;
-	size_t offset = 0;
+   std::vector<VkBufferImageCopy> bufferCopyRegions;
+   size_t offset = 0;
 
-	for (uint32_t face = 0; face < 6; ++face)
-	{
-		for (uint32_t level = 0; level < tex.levels(); ++level)
-		{
-			VkBufferImageCopy bufferCopyRegion = {};
-			bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			bufferCopyRegion.imageSubresource.mipLevel = level;
-			bufferCopyRegion.imageSubresource.baseArrayLayer = face;
-			bufferCopyRegion.imageSubresource.layerCount = 1;
-			bufferCopyRegion.imageExtent.width = static_cast<uint32_t>(tex[face][level].extent().x);
-			bufferCopyRegion.imageExtent.height = static_cast<uint32_t>(tex[face][level].extent().y);
-			bufferCopyRegion.imageExtent.depth = 1;
-			bufferCopyRegion.bufferOffset = offset;
+   for ( uint32_t face = 0; face < 6; ++face )
+   {
+      for ( uint32_t level = 0; level < tex.levels(); ++level )
+      {
+         VkBufferImageCopy bufferCopyRegion = {};
+         bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+         bufferCopyRegion.imageSubresource.mipLevel = level;
+         bufferCopyRegion.imageSubresource.baseArrayLayer = face;
+         bufferCopyRegion.imageSubresource.layerCount = 1;
+         bufferCopyRegion.imageExtent.width =
+            static_cast<uint32_t>( tex[ face ][ level ].extent().x );
+         bufferCopyRegion.imageExtent.height =
+            static_cast<uint32_t>( tex[ face ][ level ].extent().y );
+         bufferCopyRegion.imageExtent.depth = 1;
+         bufferCopyRegion.bufferOffset = offset;
 
-			bufferCopyRegions.push_back(bufferCopyRegion);
+         bufferCopyRegions.push_back( bufferCopyRegion );
 
-			// Increase offset into staging buffer for next level / face
-			offset += tex[face][level].size();
-		}
-	}
+         // Increase offset into staging buffer for next level / face
+         offset += tex[ face ][ level ].size();
+      }
+   }
 
-	// Create optimal tiled target image
-	VkImageCreateInfo imageCreateInfo{};
-	imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageCreateInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
-	imageCreateInfo.mipLevels = (uint32_t)tex.levels();
-	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-	imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	imageCreateInfo.extent = { (uint32_t) tex.extent().x, (uint32_t)tex.extent().y, 1 };
-	imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-	// Ensure that the TRANSFER_DST bit is set for staging
-	if (!(imageCreateInfo.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT))
-	{
-		imageCreateInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	}
-	// Cube faces count as array layers in Vulkan
-	imageCreateInfo.arrayLayers = 6;
-	// This flag is required for cube map images
-	imageCreateInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+   // Create optimal tiled target image
+   VkImageCreateInfo imageCreateInfo{};
+   imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+   imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+   imageCreateInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+   imageCreateInfo.mipLevels = (uint32_t)tex.levels();
+   imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+   imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+   imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+   imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+   imageCreateInfo.extent = {(uint32_t)tex.extent().x, (uint32_t)tex.extent().y, 1};
+   imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+   // Ensure that the TRANSFER_DST bit is set for staging
+   if ( !( imageCreateInfo.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT ) )
+   {
+      imageCreateInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+   }
+   // Cube faces count as array layers in Vulkan
+   imageCreateInfo.arrayLayers = 6;
+   // This flag is required for cube map images
+   imageCreateInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
-	VK_CALL( vkCreateImage(_device, &imageCreateInfo, nullptr, &img) );
+   VK_CALL( vkCreateImage( _device, &imageCreateInfo, nullptr, &img ) );
 
-	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(_device, img, &memRequirements);
+   VkMemoryRequirements memRequirements;
+   vkGetImageMemoryRequirements( _device, img, &memRequirements );
 
-	img.setMemory(_memoryManager.alloc(memRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
+   img.setMemory( _memoryManager.alloc( memRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ) );
 
-	VK_CALL(
-		vkBindImageMemory(_device, img, img.getMemory().memory, img.getMemory().offset));
+   VK_CALL( vkBindImageMemory( _device, img, img.getMemory().memory, img.getMemory().offset ) );
 
-	VkImageSubresourceRange subresourceRange = {};
-	subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	subresourceRange.baseMipLevel = 0;
-	subresourceRange.levelCount = (uint32_t)tex.levels();
-	subresourceRange.layerCount = 6;
+   VkImageSubresourceRange subresourceRange = {};
+   subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+   subresourceRange.baseMipLevel = 0;
+   subresourceRange.levelCount = (uint32_t)tex.levels();
+   subresourceRange.layerCount = 6;
 
-	transitionImageLayout(img, img._format, VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange, _device,
-		_loadCommandPool, _transferQueue.handle);
+   transitionImageLayout( img, img._format, VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, subresourceRange, _device,
+                          _loadCommandPool, _transferQueue.handle );
 
-	VkCommandBuffer commandBuffer = _loadCommandPool.alloc(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+   VkCommandBuffer commandBuffer =
+      _loadCommandPool.alloc( VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT );
 
-	vkCmdCopyBufferToImage(commandBuffer, stagingBuffer, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		static_cast<uint32_t>(bufferCopyRegions.size()), bufferCopyRegions.data());
+   vkCmdCopyBufferToImage( commandBuffer, stagingBuffer, img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           static_cast<uint32_t>( bufferCopyRegions.size() ),
+                           bufferCopyRegions.data() );
 
-	endSingleTimeCommands(commandBuffer, _device, _transferQueue.handle, _loadCommandPool);
+   endSingleTimeCommands( commandBuffer, _device, _transferQueue.handle, _loadCommandPool );
 
-	transitionImageLayout(img, img._format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange, _device,
-		_loadCommandPool, _transferQueue.handle);
+   transitionImageLayout( img, img._format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, subresourceRange, _device,
+                          _loadCommandPool, _transferQueue.handle );
 
-	// Create sampler
-	VkSamplerCreateInfo samplerCreateInfo = {};
-	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-	samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-	samplerCreateInfo.addressModeV = samplerCreateInfo.addressModeU;
-	samplerCreateInfo.addressModeW = samplerCreateInfo.addressModeU;
-	samplerCreateInfo.mipLodBias = 0.0f;
-	samplerCreateInfo.maxAnisotropy = 8;
-	samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
-	samplerCreateInfo.minLod = 0.0f;
-	samplerCreateInfo.maxLod = (float)tex.levels();
-	samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-	VK_CALL(vkCreateSampler(_device, &samplerCreateInfo, nullptr, &imgSampler));
+   // Create sampler
+   VkSamplerCreateInfo samplerCreateInfo = {};
+   samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+   samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+   samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+   samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+   samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+   samplerCreateInfo.addressModeV = samplerCreateInfo.addressModeU;
+   samplerCreateInfo.addressModeW = samplerCreateInfo.addressModeU;
+   samplerCreateInfo.mipLodBias = 0.0f;
+   samplerCreateInfo.maxAnisotropy = 8;
+   samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
+   samplerCreateInfo.minLod = 0.0f;
+   samplerCreateInfo.maxLod = (float)tex.levels();
+   samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+   VK_CALL( vkCreateSampler( _device, &samplerCreateInfo, nullptr, &imgSampler ) );
 
-	// Create image view
-	VkImageViewCreateInfo viewCreateInfo = {};
-	viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-	viewCreateInfo.format = img._format;
-	viewCreateInfo.components = { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
-	viewCreateInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-	viewCreateInfo.subresourceRange.layerCount = 6;
-	viewCreateInfo.subresourceRange.levelCount = (uint32_t) tex.levels();
-	viewCreateInfo.image = img;
-	VK_CALL(vkCreateImageView(_device, &viewCreateInfo, nullptr, &imgView));
+   // Create image view
+   VkImageViewCreateInfo viewCreateInfo = {};
+   viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+   viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+   viewCreateInfo.format = img._format;
+   viewCreateInfo.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
+                                VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
+   viewCreateInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+   viewCreateInfo.subresourceRange.layerCount = 6;
+   viewCreateInfo.subresourceRange.levelCount = (uint32_t)tex.levels();
+   viewCreateInfo.image = img;
+   VK_CALL( vkCreateImageView( _device, &viewCreateInfo, nullptr, &imgView ) );
 
-	vkDeviceWaitIdle(_device);
+   vkDeviceWaitIdle( _device );
 
-	return true;
+   return true;
 }
 
 void VulkanGraphic::updateUBO( const UniformBufferObject& ubo, const PBRMaterial& pbr )
@@ -1431,13 +1445,14 @@ void VulkanGraphic::updateUBO( const UniformBufferObject& ubo, const PBRMaterial
    void* data;
    vkMapMemory( _device, _uniformStagingBufferMemory.memory, _uniformStagingBufferMemory.offset,
                 sizeof( ubo ) + sizeof( pbr ), 0, &data );
-   memcpy( data, &ubo, sizeof( ubo ));
-   memcpy((char*)data + sizeof(ubo), &pbr, sizeof(pbr));
+   memcpy( data, &ubo, sizeof( ubo ) );
+   memcpy( (char*)data + sizeof( ubo ), &pbr, sizeof( pbr ) );
    vkUnmapMemory( _device, _uniformStagingBufferMemory.memory );
 
-   _uboUpdateCmdBuf = copyBuffer( _uniformStagingBuffer, _uniformBuffer, sizeof( ubo ) + sizeof(pbr), _device,
-                                  _transferCommandPools[ _curFrameIdx ], _transferQueue.handle, 0,
-                                  nullptr, 1, _uboUpdatedSemaphore.get() );
+   _uboUpdateCmdBuf =
+      copyBuffer( _uniformStagingBuffer, _uniformBuffer, sizeof( ubo ) + sizeof( pbr ), _device,
+                  _transferCommandPools[ _curFrameIdx ], _transferQueue.handle, 0, nullptr, 1,
+                  _uboUpdatedSemaphore.get() );
 }
 
 void VulkanGraphic::onNewFrame()
@@ -1448,7 +1463,8 @@ void VulkanGraphic::onNewFrame()
                              _imageAvailableSemaphore, VK_NULL_HANDLE, &_curFrameIdx );
    recreateSwapChainIfNotValid( res );
 
-   VK_CALL( vkWaitForFences( _device, 1, &_frameRenderedFence[ _curFrameIdx ], VK_FALSE, 100000000000 ) );
+   VK_CALL(
+      vkWaitForFences( _device, 1, &_frameRenderedFence[ _curFrameIdx ], VK_FALSE, 100000000000 ) );
    vkResetFences( _device, 1, &_frameRenderedFence[ _curFrameIdx ] );
 
    _transferCommandPools[ _curFrameIdx ].freeAll( VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT );
